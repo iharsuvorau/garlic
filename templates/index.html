@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.title}}</title>
+    <style>
+        .field {
+            margin: .5rem 0;
+        }
+    </style>
+</head>
+<body>
+<h1>Pepper Control</h1>
+<section>
+    <h2>Voice messages</h2>
+    <form action="/voice" method="post">
+        <div class="field">
+            <label for="phrase">Phrase</label>
+            <input id="phrase" name="phrase" type="text">
+        </div>
+        <div class="field">
+            <input type="submit" value="Send" />
+        </div>
+    </form>
+</section>
+</body>
+</html>

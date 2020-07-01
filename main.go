@@ -1,76 +1,71 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-	"time"
 )
 
-var upgrader = websocket.Upgrader{}
+// TODO: communicate over WSS
+// TODO: is there a need to keep WS connection live using ping-pong?
 
+var upgrader = websocket.Upgrader{}
+var wsConnection *websocket.Conn
+
+// CLI arguments
 var addr = flag.String("addr", ":8080", "http service address")
 
 func main() {
 	flag.Parse()
+
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/test", testWSHandler)
-	log.Println("listening at", *addr)
-	//log.Fatal(http.ListenAndServeTLS(*addr, "server.crt", "server.key", nil))
-	log.Fatal(http.ListenAndServe(*addr, nil))
+
+	r := gin.Default()
+	r.LoadHTMLGlob("templates/*.html")
+
+	// JSON: robot API
+	r.GET("/pepper/initiate", initiateHandler)
+
+	// HTML: user GUI
+	r.POST("/voice", voiceHandler)
+	r.GET("/", homeHandler)
+
+	log.Fatal(r.Run(*addr))
 }
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("hi there"))
-}
-
-type Message struct {
-	Command string
-	Content string
-}
-
-func testWSHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("new request")
-	log.Printf("%s, %s\n", r.RemoteAddr, r.Proto)
-
-	conn, err := upgrader.Upgrade(w, r, nil)
+func initiateHandler(c *gin.Context) {
+	var err error
+	wsConnection, err = upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Println(err)
+		return
+	}
+}
+
+type VoiceForm struct {
+	Phrase string `form:"phrase" binding:"required"`
+}
+
+func voiceHandler(c *gin.Context) {
+	var form VoiceForm
+	if err := c.Bind(&form); err != nil {
+		c.String(http.StatusBadRequest, "Wrong user input")
 		return
 	}
 
-	sayHiMsg := Message{
+	task := PepperTask{
 		Command: "say",
-		Content: "How're you doing?",
+		Content: form.Phrase,
 	}
-	sayHiMsgBytes, err := json.Marshal(sayHiMsg)
-	if err != nil {
-		log.Println(err)
+	if err := task.Send(); err != nil {
+		c.String(http.StatusInternalServerError, "Task has failed: %s", err.Error())
 		return
 	}
 
-	for {
-		//log.Println("in for loop")
+	c.String(http.StatusOK, "Task has been sent")
+}
 
-		//_, _, err := conn.ReadMessage()
-		//if err != nil {
-		//	log.Println(err)
-		//	return
-		//}
-		//log.Println("msg read")
-		//log.Printf("received: %s\n", p)
-
-		//log.Println("msg sending")
-		if err = conn.WriteMessage(websocket.TextMessage, sayHiMsgBytes); err != nil {
-			//if err = conn.WriteMessage(websocket.TextMessage, []byte("hoho")); err != nil {
-			log.Println(err)
-			return
-		}
-		log.Println("msg sent")
-
-		time.Sleep(time.Second * 5)
-	}
+func homeHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "index.html", gin.H{"title": "Garlic Home Page"})
 }
