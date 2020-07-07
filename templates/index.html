@@ -1,27 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{.title}}</title>
-    <style>
-        .field {
-            margin: .5rem 0;
-        }
-    </style>
-</head>
+<head>{{template "head" .}}</head>
 <body>
-<h1>Pepper Control</h1>
-<section>
-    <h2>Voice messages</h2>
-    <form action="/voice" method="post">
-        <div class="field">
-            <label for="phrase">Phrase</label>
-            <input id="phrase" name="phrase" type="text">
-        </div>
-        <div class="field">
-            <input type="submit" value="Send" />
-        </div>
-    </form>
+{{template "site-header" .}}
+<section class="introduction">
+    <h1 class="h1">Sessions Control</h1>
+    <p>This dashboard allows the control of the Pepper robot through the local network simply by clicking corresponding
+        buttons, either <em>questions</em>, or <em>positive answers</em>, or <em>negative answers</em>. On the right
+        side, there is available <em>the general motion library</em>, so a user can initiate any movement at any time.
+    </p>
 </section>
+<main class="sessions-control">
+    <section class="sessions">
+        <div class="mb2">
+            <h2 class="h2 mb1">{{if .currentSessionName}}{{.currentSessionName}}{{else}}Choose a session{{end}}</h2>
+            <select name="sessions" id="sessionList" class="">
+                <option value="">Please, select the session</option>
+                {{range .sessions}}
+                    <option value="{{.ID}}" {{if eq .ID $.currentSessionID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
+
+        <section class="session">
+            {{range .sessions}}
+                {{if eq .ID $.currentSessionID}}
+                    {{$sessionID := .ID}}
+                    {{range .Items}}
+                        <div class="session-item" id="session-item-{{.ID}}" data-itemid="{{.ID}}">
+                            <div class="question" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                 data-type="question">
+                                <p class="h6 bold caps" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                   data-type="question">Question</p>
+                                <div data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                     data-type="question">
+                                    <p class="h2 mb0" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                       data-type="question">{{.Question.Phrase}}</p>
+                                    <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                       data-type="question">audio: {{.Question.AudioFilePath}}
+                                        <br/>motion: {{.Question.MotionName}}</p>
+                                </div>
+                            </div>
+                            <div class="answers">
+                                <div class="positive-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                     data-type="positiveAnswer">
+                                    <p class="h3 mb0 positive" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                       data-type="positiveAnswer">{{.PositiveAnswer.Phrase}}</p>
+                                    <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                       data-type="positiveAnswer">audio: {{.PositiveAnswer.AudioFilePath}}
+                                        <br/>motion: {{.PositiveAnswer.MotionName}}</p>
+                                </div>
+                                <div class="negative-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                     data-type="negativeAnswer">
+                                    <p class="h3 mb0 negative" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                       data-type="negativeAnswer">{{.NegativeAnswer.Phrase}}</p>
+                                    <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                       data-type="negativeAnswer">audio: {{.NegativeAnswer.AudioFilePath}}
+                                        <br/>motion: {{.NegativeAnswer.MotionName}}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {{end}}
+                {{end}}
+            {{end}}
+        </section>
+
+        <form action="/voice" method="post" style="display: none;">
+            <div class="field">
+                <label for="phrase">Phrase</label>
+                <input id="phrase" name="phrase" type="text">
+            </div>
+            <div class="field">
+                <input type="submit" value="Send"/>
+            </div>
+        </form>
+    </section>
+    <aside>
+        <h2 class="h2">Motion Library</h2>
+    </aside>
+</main>
+{{template "body-bottom" .}}
 </body>
 </html>
