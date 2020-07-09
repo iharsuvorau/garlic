@@ -11,39 +11,38 @@ window.addEventListener('DOMContentLoaded', (event) => {
     const questions = document.getElementsByClassName("question");
     const positives = document.getElementsByClassName("positive-answer");
     const negatives = document.getElementsByClassName("negative-answer");
+    const collectionsOfItems = [].concat(questions, positives, negatives);
+
+    const sessionItemElements = document.getElementsByClassName("session-item-element");
 
     const notifications = document.getElementById("notifications");
 
-    // collecting all questions and answers to be able to mark them as active on clicking
-    const questionItems = document.getElementsByClassName("question");
-    const positiveItems = document.getElementsByClassName("positive-answer");
-    const negativeItems = document.getElementsByClassName("negative-answer");
-    const collectionsOfItems = [].concat(questionItems, positiveItems, negativeItems);
-
-    for (const collection of [].concat(questions, positives, negatives)) {
+    for (const collection of collectionsOfItems) {
         for (const item of collection) {
             item.addEventListener("click", (event) => {
-                const sessionID = parseInt(event.target.dataset.sessionid);
-                const itemID = parseInt(event.target.dataset.itemid);
-                const itemType = event.target.dataset.type;
+                // const sessionID = event.target.dataset.sessionid;
+                const itemID = event.target.dataset.itemid;
+                // const itemType = event.target.dataset.type;
+
+                const requestData = {
+                    "item_id": itemID,
+                };
+                console.log("request:", requestData);
 
                 // requesting the JSON API
                 fetch("/pepper/send_command", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({
-                        "session_id": sessionID,
-                        "item_type": itemType,
-                        "item_id": itemID,
-                    })
+                    body: JSON.stringify(requestData)
                 }).then(response => {
                     return response.json();
                 }).then(data => {
+                    console.log(data);
                     let message = "error";
                     let notificationClass = "message";
                     if (data.message && data.message.length > 0) {
                         message = data.message;
-                        markSessionItemActive(sessionID, itemID, itemType, collectionsOfItems);
+                        markSessionItemActive(itemID, sessionItemElements);
                     } else if (data.error && data.error.length > 0) {
                         message = data.error;
                         notificationClass = "error";
@@ -73,15 +72,14 @@ function debug(label, content) {
     console.log(label + ":", content);
 }
 
-function markSessionItemActive(sessionID, itemID, itemType, collections) {
-    const curItem = document.getElementById(itemType + "-" + String(sessionID) + "." + String(itemID));
-
-    for (const collection of collections) {
-        for (const item of collection) {
-            item.classList.remove("active");
-        }
+function markSessionItemActive(itemID, items) {
+    for (const item of items) {
+        item.classList.remove("active");
     }
 
+    const curItem = document.getElementById(itemID);
     curItem.classList.add("active");
     curItem.classList.add("visited");
+
+    console.log(curItem);
 }

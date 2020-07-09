@@ -26,43 +26,52 @@
             {{range .sessions}}
                 {{if eq .ID $.currentSessionID}}
                     {{$sessionID := .ID}}
+                    {{$questionCounter := 0}}
                     {{range .Items}}
-                        <div class="session-item" id="session-item-{{.ID}}" data-itemid="{{.ID}}">
-                            <div id="question-{{$sessionID}}.{{.ID}}" class="question" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                 data-type="question">
-                                <p class="h6 bold caps" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                   data-type="question">Question {{.ID}}</p>
-                                <div data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                     data-type="question">
-                                    <p class="h2 mb0" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="question">{{.Question.Phrase}}</p>
-                                    <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="question"><span class="bold">audio</span>: {{.Question.AudioFilePath}}
+                        {{$questionCounter = ($questionCounter | increment)}}
+                        {{/* each HTML element must have an ID in order to be recognized and be found later in the
+                        JS script to mark it as "visited" or "active" */}}
+                        <div class="session-item" id="{{.ID}}" data-itemid="{{.ID}}">
+
+                            <div id="{{.Question.ID}}" class="question session-item-element" data-itemid="{{.Question.ID}}">
+                                <p class="h6 bold caps" data-itemid="{{.Question.ID}}">Question {{$questionCounter}}</p>
+                                <div data-itemid="{{.Question.ID}}">
+                                    <p class="h2 mb0"
+                                       data-itemid="{{.Question.ID}}">{{.Question.Phrase}}</p>
+                                    <p class="h6"
+                                       data-itemid="{{.Question.ID}}"><span class="bold">audio</span>: {{.Question.AudioFilePath}}
                                         <br/><span class="bold">motion</span>: {{.Question.MotionName}}{{if .Question.MotionDelay}} <span class="bold">with delay</span> of {{.Question.MotionDelay}}{{end}}</p>
                                 </div>
                             </div>
+
                             <div class="answers">
-                                <div id="positive-answer-{{$sessionID}}.{{.ID}}" class="positive-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                     data-type="positive-answer">
+                                {{if .PositiveAnswer}}
+                                <div id="{{.PositiveAnswer.ID}}" class="positive-answer session-item-element"
+                                     data-itemid="{{.PositiveAnswer.ID}}">
                                     {{if .PositiveAnswer.Phrase}}
-                                    <p class="h3 mb0 positive" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="positive-answer">{{.PositiveAnswer.Phrase}}</p>
+                                    <p class="h3 mb0 positive"
+                                       data-itemid="{{.PositiveAnswer.ID}}">{{.PositiveAnswer.Phrase}}</p>
                                     {{end}}
-                                    <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="positive-answer">{{if .PositiveAnswer.AudioFilePath}}audio: {{.PositiveAnswer.AudioFilePath}}
+                                    <p class="h6"
+                                       data-itemid="{{.PositiveAnswer.ID}}">{{if .PositiveAnswer.AudioFilePath}}audio: {{.PositiveAnswer.AudioFilePath}}
                                         <br/>{{end}}{{if .PositiveAnswer.MotionName}}motion: {{.PositiveAnswer.MotionName}}{{end}}</p>
                                 </div>
-                                <div id="negative-answer-{{$sessionID}}.{{.ID}}" class="negative-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                     data-type="negative-answer">
+                                {{end}}
+
+                                {{if .NegativeAnswer}}
+                                <div id="{{.NegativeAnswer.ID}}" class="negative-answer session-item-element"
+                                     data-itemid="{{.NegativeAnswer.ID}}">
                                     {{if .NegativeAnswer.Phrase}}
-                                    <p class="h3 mb0 negative" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="negative-answer">{{.NegativeAnswer.Phrase}}</p>
+                                    <p class="h3 mb0 negative"
+                                       data-itemid="{{.NegativeAnswer.ID}}">{{.NegativeAnswer.Phrase}}</p>
                                     {{end}}
-                                    <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="negative-answer">{{if .NegativeAnswer.AudioFilePath}}audio: {{.NegativeAnswer.AudioFilePath}}
+                                    <p class="h6"
+                                       data-itemid="{{.NegativeAnswer.ID}}">{{if .NegativeAnswer.AudioFilePath}}audio: {{.NegativeAnswer.AudioFilePath}}
                                         <br/>{{end}}{{if .NegativeAnswer.MotionName}}motion: {{.NegativeAnswer.MotionName}}{{end}}</p>
                                 </div>
+                                {{end}}
                             </div>
+
                         </div>
                     {{end}}
                 {{end}}

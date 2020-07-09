@@ -4,28 +4,46 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 // TODO: communicate over WSS
 // TODO: is there a need to keep WS connection live using ping-pong?
 // TODO: implement basic auth and logout
 
-var upgrader = websocket.Upgrader{}
-var wsConnection *websocket.Conn
+// App-wide variables
+var (
+	// wsUpgrader is needed to use WebSocket
+	wsUpgrader = websocket.Upgrader{}
+
+	// wsConnection keeps the current WebSocket connection.
+	// Only one connection can be at the moment with the Pepper robot.
+	wsConnection *websocket.Conn
+)
 
 // CLI arguments
-var addr = flag.String("addr", ":8080", "http service address")
+var (
+	servingAddr = flag.String("addr", ":8080", "http service address")
+	dataDir     = flag.String("data", "data", "path to the folder with sessions data")
+)
 
 func main() {
 	flag.Parse()
 
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
 	r := gin.New()
+
+	r.SetFuncMap(template.FuncMap{
+		"plus":      plus,
+		"increment": increment,
+	})
+
 	r.LoadHTMLGlob("templates/*.html")
 
 	// JSON: robot API
@@ -41,7 +59,17 @@ func main() {
 	r.GET("/about/", pageHandler("About"))
 	r.GET("/", homeHandler)
 
-	log.Fatal(r.Run(*addr))
+	log.Fatal(r.Run(*servingAddr))
+}
+
+// Template Helpers
+
+func plus(a, b int) int {
+	return a + b
+}
+
+func increment(a int) int {
+	return a + 1
 }
 
 // Handlers
@@ -50,36 +78,56 @@ func sendCommandHandler(c *gin.Context) {
 	var form SendCommandForm
 	err := c.BindJSON(&form)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		defer c.Request.Body.Close()
+
+		b, e := ioutil.ReadAll(c.Request.Body)
+		if e != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": e.Error()})
+			return
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"method":  "sendCommandHandler",
+			"error":   err.Error(),
+			"request": fmt.Sprintf("%s", b),
+		})
 		return
 	}
 
 	log.Printf("form: %+v", form)
 
-	var currentItem *SayWithMotionItem
-	for _, session := range sessions {
-		if session.ID == form.SessionID {
-			for _, sessionItem := range session.Items {
-				if sessionItem.ID == form.ItemID {
-					switch form.ItemType {
-					case "question":
-						currentItem = &sessionItem.Question
-					case "positive-answer":
-						currentItem = &sessionItem.PositiveAnswer
-					case "negative-answer":
-						currentItem = &sessionItem.NegativeAnswer
-					default:
-						c.JSON(http.StatusBadRequest, gin.H{"error": "unrecognized item type"})
-						return
-					}
-					break
-				}
-			}
-		}
+	currentItem := Sessions(sessions).GetSayWithMotionItemByID(form.ItemID)
+	if currentItem == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": fmt.Sprintf("can't find an instruction with the ID %s", form.ItemID),
+		})
+		return
 	}
+
+	//var currentItem *SayWithMotionItem
+	//for _, session := range sessions {
+	//	if session.ID == form.SessionID {
+	//		for _, sessionItem := range session.Items {
+	//			if sessionItem.ID == form.ItemID {
+	//				switch form.ItemType {
+	//				case "question":
+	//					currentItem = &sessionItem.Question
+	//				case "positive-answer":
+	//					currentItem = &sessionItem.PositiveAnswer
+	//				case "negative-answer":
+	//					currentItem = &sessionItem.NegativeAnswer
+	//				default:
+	//					c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": "unrecognized item type"})
+	//					return
+	//				}
+	//				break
+	//			}
+	//		}
+	//	}
+	//}
 	log.Printf("chosed item: %+v", currentItem)
 	if currentItem.Phrase == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "a phrase must be present"})
+		c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": "a phrase must be present"})
 		return
 	}
 
@@ -95,7 +143,7 @@ func homeHandler(c *gin.Context) {
 
 func initiateHandler(c *gin.Context) {
 	var err error
-	wsConnection, err = upgrader.Upgrade(c.Writer, c.Request, nil)
+	wsConnection, err = wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
@@ -123,10 +171,15 @@ func voiceHandler(c *gin.Context) {
 func sessionsHandler(c *gin.Context) {
 	activeMenu("Sessions", siteMenuItems)
 
-	var curSessionID int64
+	var curSessionID uuid.UUID
 	var curSessionName string
+	//var err error
 
-	curSessionID, _ = strconv.ParseInt(c.Param("id"), 10, 64)
+	curSessionID, _ = uuid.Parse(c.Param("id"))
+	//if err != nil {
+	//	c.JSON(http.StatusBadRequest, gin.H{"method": "sessionsHandler", "error": "session id is not an instance of UUID"})
+	//	return
+	//}
 
 	for _, v := range sessions {
 		if v.ID == curSessionID {
@@ -145,6 +198,8 @@ func sessionsHandler(c *gin.Context) {
 	})
 }
 
+// pageHandler is a handler for any simple HTML page.
+// The templateName must match the base name of the HTML-template itself, it's case sensitive.
 func pageHandler(templateName string) func(*gin.Context) {
 	return func(c *gin.Context) {
 		activeMenu(templateName, siteMenuItems)
@@ -156,7 +211,7 @@ func pageHandler(templateName string) func(*gin.Context) {
 	}
 }
 
-// Menu
+// Website Menu
 
 func activeMenu(title string, items []*MenuItem) {
 	for _, item := range items {
@@ -200,12 +255,13 @@ var userMenuItems = []*MenuItem{
 	},
 }
 
-// Forms
+// Forms and JSON requests the app needs to handle
 
 type SendCommandForm struct {
-	SessionID int64  `json:"session_id" binding:"required"`
-	ItemID    int64  `json:"item_id" binding:"required"`
-	ItemType  string `json:"item_type" binding:"required"` // possible values: question, positive-answer, negative-answer
+	//SessionID uuid.UUID  `json:"session_id" binding:"required"`
+	ItemID uuid.UUID `json:"item_id" binding:"required"`
+	// ItemType specifies on of the possible values: question, positive-answer, negative-answer.
+	//ItemType  string `json:"item_type" binding:"required"`
 }
 
 type VoiceForm struct {
