@@ -100,7 +100,8 @@ p {
     justify-content: space-between;
 }
 
-.active .question {
+.question.active, .positive-answer.active, .negative-answer.active,
+.question.visited, .positive-answer.visited, .negative-answer.visited {
     background: #e5f7fd;
 }
 
@@ -135,7 +136,7 @@ p {
 .notifications {
     display: flex;
     flex-direction: column;
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     padding: 1rem;
@@ -143,11 +144,19 @@ p {
 }
 
 .notification-item {
-    background: rgb(0, 29, 58);
+    background: darkseagreen;
     border-radius: 2rem;
     color: white;
     padding: 1rem;
     margin-top: 1rem;
     transition: all ease-in-out .2s;
     font-weight: bold;
+}
+
+.notification-item.error {
+    background: coral;
+}
+
+.notification-item.error::before {
+    content: "ERROR: ";
 }

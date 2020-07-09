@@ -28,35 +28,39 @@
                     {{$sessionID := .ID}}
                     {{range .Items}}
                         <div class="session-item" id="session-item-{{.ID}}" data-itemid="{{.ID}}">
-                            <div class="question" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                            <div id="question-{{$sessionID}}.{{.ID}}" class="question" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
                                  data-type="question">
                                 <p class="h6 bold caps" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                   data-type="question">Question</p>
+                                   data-type="question">Question {{.ID}}</p>
                                 <div data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
                                      data-type="question">
                                     <p class="h2 mb0" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
                                        data-type="question">{{.Question.Phrase}}</p>
                                     <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="question">audio: {{.Question.AudioFilePath}}
-                                        <br/>motion: {{.Question.MotionName}}</p>
+                                       data-type="question"><span class="bold">audio</span>: {{.Question.AudioFilePath}}
+                                        <br/><span class="bold">motion</span>: {{.Question.MotionName}}{{if .Question.MotionDelay}} <span class="bold">with delay</span> of {{.Question.MotionDelay}}{{end}}</p>
                                 </div>
                             </div>
                             <div class="answers">
-                                <div class="positive-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                     data-type="positiveAnswer">
+                                <div id="positive-answer-{{$sessionID}}.{{.ID}}" class="positive-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                     data-type="positive-answer">
+                                    {{if .PositiveAnswer.Phrase}}
                                     <p class="h3 mb0 positive" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="positiveAnswer">{{.PositiveAnswer.Phrase}}</p>
+                                       data-type="positive-answer">{{.PositiveAnswer.Phrase}}</p>
+                                    {{end}}
                                     <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="positiveAnswer">audio: {{.PositiveAnswer.AudioFilePath}}
-                                        <br/>motion: {{.PositiveAnswer.MotionName}}</p>
+                                       data-type="positive-answer">{{if .PositiveAnswer.AudioFilePath}}audio: {{.PositiveAnswer.AudioFilePath}}
+                                        <br/>{{end}}{{if .PositiveAnswer.MotionName}}motion: {{.PositiveAnswer.MotionName}}{{end}}</p>
                                 </div>
-                                <div class="negative-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                     data-type="negativeAnswer">
+                                <div id="negative-answer-{{$sessionID}}.{{.ID}}" class="negative-answer" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
+                                     data-type="negative-answer">
+                                    {{if .NegativeAnswer.Phrase}}
                                     <p class="h3 mb0 negative" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="negativeAnswer">{{.NegativeAnswer.Phrase}}</p>
+                                       data-type="negative-answer">{{.NegativeAnswer.Phrase}}</p>
+                                    {{end}}
                                     <p class="h6" data-sessionid="{{$sessionID}}" data-itemid="{{.ID}}"
-                                       data-type="negativeAnswer">audio: {{.NegativeAnswer.AudioFilePath}}
-                                        <br/>motion: {{.NegativeAnswer.MotionName}}</p>
+                                       data-type="negative-answer">{{if .NegativeAnswer.AudioFilePath}}audio: {{.NegativeAnswer.AudioFilePath}}
+                                        <br/>{{end}}{{if .NegativeAnswer.MotionName}}motion: {{.NegativeAnswer.MotionName}}{{end}}</p>
                                 </div>
                             </div>
                         </div>

@@ -12,6 +12,7 @@ import (
 
 // TODO: communicate over WSS
 // TODO: is there a need to keep WS connection live using ping-pong?
+// TODO: implement basic auth and logout
 
 var upgrader = websocket.Upgrader{}
 var wsConnection *websocket.Conn
@@ -55,24 +56,18 @@ func sendCommandHandler(c *gin.Context) {
 
 	log.Printf("form: %+v", form)
 
-	var sayPhrase, audioFileName, motion string
+	var currentItem *SayWithMotionItem
 	for _, session := range sessions {
 		if session.ID == form.SessionID {
 			for _, sessionItem := range session.Items {
 				if sessionItem.ID == form.ItemID {
 					switch form.ItemType {
 					case "question":
-						sayPhrase = sessionItem.Question.Phrase
-						audioFileName = sessionItem.Question.AudioFilePath
-						motion = sessionItem.Question.MotionName
-					case "positiveAnswer":
-						sayPhrase = sessionItem.PositiveAnswer.Phrase
-						audioFileName = sessionItem.PositiveAnswer.AudioFilePath
-						motion = sessionItem.PositiveAnswer.MotionName
-					case "negativeAnswer":
-						sayPhrase = sessionItem.NegativeAnswer.Phrase
-						audioFileName = sessionItem.NegativeAnswer.AudioFilePath
-						motion = sessionItem.NegativeAnswer.MotionName
+						currentItem = &sessionItem.Question
+					case "positive-answer":
+						currentItem = &sessionItem.PositiveAnswer
+					case "negative-answer":
+						currentItem = &sessionItem.NegativeAnswer
 					default:
 						c.JSON(http.StatusBadRequest, gin.H{"error": "unrecognized item type"})
 						return
@@ -82,10 +77,14 @@ func sendCommandHandler(c *gin.Context) {
 			}
 		}
 	}
-	log.Printf("command: say, phrase: %s, audio: %s, motion: %s",
-		sayPhrase, audioFileName, motion)
+	log.Printf("chosed item: %+v", currentItem)
+	if currentItem.Phrase == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "a phrase must be present"})
+		return
+	}
 
-	// TODO: process the command
+	// TODO: process the command: play sounds locally, execute motions remotely
+	// TODO: implement delay for some motions
 
 	c.JSON(http.StatusOK, gin.H{"message": "the command has been sent"})
 }
@@ -206,7 +205,7 @@ var userMenuItems = []*MenuItem{
 type SendCommandForm struct {
 	SessionID int64  `json:"session_id" binding:"required"`
 	ItemID    int64  `json:"item_id" binding:"required"`
-	ItemType  string `json:"item_type" binding:"required"`
+	ItemType  string `json:"item_type" binding:"required"` // possible values: question, positive-answer, negative-answer
 }
 
 type VoiceForm struct {

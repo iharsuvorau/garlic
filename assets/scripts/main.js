@@ -13,7 +13,12 @@ window.addEventListener('DOMContentLoaded', (event) => {
     const negatives = document.getElementsByClassName("negative-answer");
 
     const notifications = document.getElementById("notifications");
-    const sessionItems = document.getElementsByClassName("session-item");
+
+    // collecting all questions and answers to be able to mark them as active on clicking
+    const questionItems = document.getElementsByClassName("question");
+    const positiveItems = document.getElementsByClassName("positive-answer");
+    const negativeItems = document.getElementsByClassName("negative-answer");
+    const collectionsOfItems = [].concat(questionItems, positiveItems, negativeItems);
 
     for (const collection of [].concat(questions, positives, negatives)) {
         for (const item of collection) {
@@ -32,14 +37,13 @@ window.addEventListener('DOMContentLoaded', (event) => {
                         "item_id": itemID,
                     })
                 }).then(response => {
-                    console.log("got response:", response.status, response.statusText);
                     return response.json();
                 }).then(data => {
                     let message = "error";
                     let notificationClass = "message";
                     if (data.message && data.message.length > 0) {
                         message = data.message;
-                        markSessionItemActive(itemID, sessionItems);
+                        markSessionItemActive(sessionID, itemID, itemType, collectionsOfItems);
                     } else if (data.error && data.error.length > 0) {
                         message = data.error;
                         notificationClass = "error";
@@ -55,7 +59,6 @@ window.addEventListener('DOMContentLoaded', (event) => {
                     // removing the notification after some time
                     const timeoutID = window.setTimeout(() => {
                         window.clearTimeout(timeoutID);
-                        console.log("timer stopped");
                         notifications.removeChild(notification);
                     }, 1500);
                 }).catch(error => {
@@ -70,13 +73,15 @@ function debug(label, content) {
     console.log(label + ":", content);
 }
 
-function markSessionItemActive(itemID, items) {
-    const curItem = document.getElementById("session-item-" + String(itemID));
-    for (const item of items) {
-        if (curItem.dataset.itemid != item.dataset.itemid) {
+function markSessionItemActive(sessionID, itemID, itemType, collections) {
+    const curItem = document.getElementById(itemType + "-" + String(sessionID) + "." + String(itemID));
+
+    for (const collection of collections) {
+        for (const item of collection) {
             item.classList.remove("active");
-        } else {
-            item.classList.add("active");
         }
     }
+
+    curItem.classList.add("active");
+    curItem.classList.add("visited");
 }
