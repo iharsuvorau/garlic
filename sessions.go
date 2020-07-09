@@ -2,6 +2,9 @@ package main
 
 import (
 	"github.com/google/uuid"
+	"os"
+	"path"
+	"regexp"
 	"time"
 )
 
@@ -27,31 +30,19 @@ type SayWithMotionItem struct {
 	MotionDelay   time.Duration
 }
 
+func (item *SayWithMotionItem) IsValid() bool {
+	if item.Phrase == "" || !IsValidUUID(item.ID.String()) || item.AudioFilePath == "" {
+		return false
+	}
+	return true
+}
+
+func IsValidUUID(uuid string) bool {
+	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
+	return r.MatchString(uuid)
+}
+
 type Sessions []*Session
-
-func (ss Sessions) GetSessionByID(id uuid.UUID) *Session {
-	for _, s := range ss {
-		if s.ID == id {
-			return s
-		}
-	}
-	return nil
-}
-
-func (ss Sessions) GetSessionItemByID(sessionID, itemID uuid.UUID) *SessionItem {
-	s := ss.GetSessionByID(sessionID)
-	if s == nil {
-		return nil
-	}
-
-	for _, v := range s.Items {
-		if v.ID == itemID {
-			return v
-		}
-	}
-
-	return nil
-}
 
 func (ss Sessions) GetSayWithMotionItemByID(id uuid.UUID) *SayWithMotionItem {
 	for _, session := range ss {
@@ -70,7 +61,6 @@ func (ss Sessions) GetSayWithMotionItemByID(id uuid.UUID) *SayWithMotionItem {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -89,18 +79,14 @@ var sessions = []*Session{
 					MotionDelay:   0,
 				},
 				PositiveAnswer: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "OK",
-					AudioFilePath: "ok.wav",
-					MotionName:    "ok.qianim",
-					MotionDelay:   0,
+					ID:          uuid.Must(uuid.NewRandom()),
+					Phrase:      "OK",
+					MotionDelay: 0,
 				},
 				NegativeAnswer: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Not OK",
-					AudioFilePath: "notok.wav",
-					MotionName:    "notok.qianim",
-					MotionDelay:   0,
+					ID:          uuid.Must(uuid.NewRandom()),
+					Phrase:      "Not OK",
+					MotionDelay: 0,
 				},
 			},
 			{
@@ -113,18 +99,14 @@ var sessions = []*Session{
 					MotionDelay:   0,
 				},
 				PositiveAnswer: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "OK",
-					AudioFilePath: "ok.wav",
-					MotionName:    "ok.qianim",
-					MotionDelay:   0,
+					ID:          uuid.Must(uuid.NewRandom()),
+					Phrase:      "OK",
+					MotionDelay: 0,
 				},
 				NegativeAnswer: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Not OK",
-					AudioFilePath: "notok.wav",
-					MotionName:    "notok.qianim",
-					MotionDelay:   0,
+					ID:          uuid.Must(uuid.NewRandom()),
+					Phrase:      "Not OK",
+					MotionDelay: 0,
 				},
 			},
 			{
@@ -189,4 +171,30 @@ var sessions = []*Session{
 			},
 		},
 	},
+}
+
+func initSessions(sessions []*Session, dataDir string) error {
+	for _, s := range sessions {
+		for _, item := range s.Items {
+			if item.Question != nil && item.Question.AudioFilePath != "" {
+				item.Question.AudioFilePath = path.Join(dataDir, s.Name, item.Question.AudioFilePath)
+				if _, err := os.Stat(item.Question.AudioFilePath); os.IsNotExist(err) {
+					return err
+				}
+			}
+			if item.PositiveAnswer != nil && item.PositiveAnswer.AudioFilePath != "" {
+				item.PositiveAnswer.AudioFilePath = path.Join(dataDir, s.Name, item.PositiveAnswer.AudioFilePath)
+				if _, err := os.Stat(item.PositiveAnswer.AudioFilePath); os.IsNotExist(err) {
+					return err
+				}
+			}
+			if item.NegativeAnswer != nil && item.NegativeAnswer.AudioFilePath != "" {
+				item.NegativeAnswer.AudioFilePath = path.Join(dataDir, s.Name, item.NegativeAnswer.AudioFilePath)
+				if _, err := os.Stat(item.NegativeAnswer.AudioFilePath); os.IsNotExist(err) {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -36,11 +36,11 @@
                             <div id="{{.Question.ID}}" class="question session-item-element" data-itemid="{{.Question.ID}}">
                                 <p class="h6 bold caps" data-itemid="{{.Question.ID}}">Question {{$questionCounter}}</p>
                                 <div data-itemid="{{.Question.ID}}">
-                                    <p class="h2 mb0"
-                                       data-itemid="{{.Question.ID}}">{{.Question.Phrase}}</p>
-                                    <p class="h6"
-                                       data-itemid="{{.Question.ID}}"><span class="bold">audio</span>: {{.Question.AudioFilePath}}
+                                    <p class="h2 mb0" data-itemid="{{.Question.ID}}">{{.Question.Phrase}}</p>
+                                    <p class="h6" data-itemid="{{.Question.ID}}"><span class="bold">audio</span>: {{.Question.AudioFilePath | basename}}
                                         <br/><span class="bold">motion</span>: {{.Question.MotionName}}{{if .Question.MotionDelay}} <span class="bold">with delay</span> of {{.Question.MotionDelay}}{{end}}</p>
+                                    <audio id="audio-{{.Question.ID}}" src="/{{.Question.AudioFilePath}}">Your
+                                        browser does not support the <code>audio</code> element.</audio>
                                 </div>
                             </div>
 
@@ -49,25 +49,23 @@
                                 <div id="{{.PositiveAnswer.ID}}" class="positive-answer session-item-element"
                                      data-itemid="{{.PositiveAnswer.ID}}">
                                     {{if .PositiveAnswer.Phrase}}
-                                    <p class="h3 mb0 positive"
-                                       data-itemid="{{.PositiveAnswer.ID}}">{{.PositiveAnswer.Phrase}}</p>
+                                    <p class="h3 mb0 positive" data-itemid="{{.PositiveAnswer.ID}}">{{.PositiveAnswer.Phrase}}</p>
                                     {{end}}
-                                    <p class="h6"
-                                       data-itemid="{{.PositiveAnswer.ID}}">{{if .PositiveAnswer.AudioFilePath}}audio: {{.PositiveAnswer.AudioFilePath}}
+                                    <p class="h6" data-itemid="{{.PositiveAnswer.ID}}">{{if .PositiveAnswer.AudioFilePath}}audio: {{.PositiveAnswer.AudioFilePath | basename}}
                                         <br/>{{end}}{{if .PositiveAnswer.MotionName}}motion: {{.PositiveAnswer.MotionName}}{{end}}</p>
+                                    <audio id="audio-{{.PositiveAnswer.ID}}" src="/{{.Question.AudioFilePath}}">Your
+                                        browser does not support the <code>audio</code> element.</audio>
                                 </div>
                                 {{end}}
 
                                 {{if .NegativeAnswer}}
-                                <div id="{{.NegativeAnswer.ID}}" class="negative-answer session-item-element"
-                                     data-itemid="{{.NegativeAnswer.ID}}">
+                                <div id="{{.NegativeAnswer.ID}}" class="negative-answer session-item-element" data-itemid="{{.NegativeAnswer.ID}}">
                                     {{if .NegativeAnswer.Phrase}}
-                                    <p class="h3 mb0 negative"
-                                       data-itemid="{{.NegativeAnswer.ID}}">{{.NegativeAnswer.Phrase}}</p>
+                                    <p class="h3 mb0 negative" data-itemid="{{.NegativeAnswer.ID}}">{{.NegativeAnswer.Phrase}}</p>
                                     {{end}}
-                                    <p class="h6"
-                                       data-itemid="{{.NegativeAnswer.ID}}">{{if .NegativeAnswer.AudioFilePath}}audio: {{.NegativeAnswer.AudioFilePath}}
+                                    <p class="h6" data-itemid="{{.NegativeAnswer.ID}}">{{if .NegativeAnswer.AudioFilePath}}audio: {{.NegativeAnswer.AudioFilePath | basename}}
                                         <br/>{{end}}{{if .NegativeAnswer.MotionName}}motion: {{.NegativeAnswer.MotionName}}{{end}}</p>
+                                    <audio id="audio-{{.PositiveAnswer.ID}}" src="/{{.NegativeAnswer.AudioFilePath}}">Your browser does not support the <code>audio</code> element.</audio>
                                 </div>
                                 {{end}}
                             </div>

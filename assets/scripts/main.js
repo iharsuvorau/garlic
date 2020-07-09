@@ -8,63 +8,60 @@ window.addEventListener('DOMContentLoaded', (event) => {
         })
     }
 
-    const questions = document.getElementsByClassName("question");
-    const positives = document.getElementsByClassName("positive-answer");
-    const negatives = document.getElementsByClassName("negative-answer");
-    const collectionsOfItems = [].concat(questions, positives, negatives);
-
     const sessionItemElements = document.getElementsByClassName("session-item-element");
-
     const notifications = document.getElementById("notifications");
 
-    for (const collection of collectionsOfItems) {
-        for (const item of collection) {
-            item.addEventListener("click", (event) => {
-                // const sessionID = event.target.dataset.sessionid;
-                const itemID = event.target.dataset.itemid;
-                // const itemType = event.target.dataset.type;
+    // creating an audio environment
+    const AudioContext = window.AudioContext || window.webkitAudioContext;  // for cross browser
+    let audioCtx, audioElement;
+    audioCtx = new AudioContext();
 
-                const requestData = {
-                    "item_id": itemID,
-                };
-                console.log("request:", requestData);
+    for (const item of sessionItemElements) {
+        item.addEventListener("click", (event) => {
+            // preparing request data
+            const itemID = event.target.dataset.itemid;
+            const requestData = {
+                "item_id": itemID,
+            };
+            console.log("request:", requestData);
 
-                // requesting the JSON API
-                fetch("/pepper/send_command", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify(requestData)
-                }).then(response => {
-                    return response.json();
-                }).then(data => {
-                    console.log(data);
-                    let message = "error";
-                    let notificationClass = "message";
-                    if (data.message && data.message.length > 0) {
-                        message = data.message;
-                        markSessionItemActive(itemID, sessionItemElements);
-                    } else if (data.error && data.error.length > 0) {
-                        message = data.error;
-                        notificationClass = "error";
+            // requesting the JSON API
+            fetch("/pepper/send_command", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(requestData)
+            }).then(response => {
+                return response.json();
+            }).then(data => {
+                console.log(data);
+                let message = "error";
+                let notificationClass = "message";
+                if (data.message && data.message.length > 0) {
+                    // message for a notification in UI
+                    message = data.message;
+
+                    // marking as "visited" and "active" in UI
+                    markSessionItemActive(itemID, sessionItemElements);
+
+                    // playing an audio
+                    audioElement = document.getElementById("audio-" + itemID);
+                    if (audioElement) {
+                        try {
+                            audioElement.play()
+                        } catch (err) {
+                            console.error(err);
+                        }
                     }
+                } else if (data.error && data.error.length > 0) {
+                    message = data.error;
+                    notificationClass = "error";
+                }
 
-                    // creating a notification
-                    const notification = document.createElement("div");
-                    notification.classList.add("notification-item");
-                    notification.classList.add(notificationClass);
-                    notification.innerText = message;
-                    notifications.appendChild(notification);
-
-                    // removing the notification after some time
-                    const timeoutID = window.setTimeout(() => {
-                        window.clearTimeout(timeoutID);
-                        notifications.removeChild(notification);
-                    }, 1500);
-                }).catch(error => {
-                    console.log("error:", error)
-                })
+                showNotifications(notificationClass, message, notifications)
+            }).catch(error => {
+                console.log("error:", error)
             })
-        }
+        })
     }
 });
 
@@ -82,4 +79,18 @@ function markSessionItemActive(itemID, items) {
     curItem.classList.add("visited");
 
     console.log(curItem);
+}
+
+function showNotifications(label, message, notifications) {
+    const notification = document.createElement("div");
+    notification.classList.add("notification-item");
+    notification.classList.add(label);
+    notification.innerText = message;
+    notifications.appendChild(notification);
+
+    // removing the notification after some time
+    const timeoutID = window.setTimeout(() => {
+        window.clearTimeout(timeoutID);
+        notifications.removeChild(notification);
+    }, 1500);
 }

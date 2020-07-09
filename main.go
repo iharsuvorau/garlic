@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path"
 )
 
 // TODO: communicate over WSS
@@ -35,13 +36,20 @@ var (
 func main() {
 	flag.Parse()
 
+	// Initialization of essential variables
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	if err := initSessions(sessions, *dataDir); err != nil {
+		log.Fatal(err)
+	}
+
+	// Routes
 
 	r := gin.New()
 
 	r.SetFuncMap(template.FuncMap{
 		"plus":      plus,
 		"increment": increment,
+		"basename":  basename,
 	})
 
 	r.LoadHTMLGlob("templates/*.html")
@@ -50,8 +58,11 @@ func main() {
 	r.GET("/pepper/initiate", initiateHandler)
 	r.POST("/pepper/send_command", sendCommandHandler)
 
-	// HTML: user GUI
+	// Static assets
 	r.Static("/assets/", "assets")
+	r.Static(fmt.Sprintf("/%s/", *dataDir), *dataDir)
+
+	// HTML: user GUI
 	r.POST("/voice", voiceHandler)
 	r.GET("/sessions/:id", sessionsHandler)
 	r.GET("/sessions/", sessionsHandler)
@@ -70,6 +81,10 @@ func plus(a, b int) int {
 
 func increment(a int) int {
 	return a + 1
+}
+
+func basename(s string) string {
+	return path.Base(s)
 }
 
 // Handlers
@@ -99,39 +114,19 @@ func sendCommandHandler(c *gin.Context) {
 	currentItem := Sessions(sessions).GetSayWithMotionItemByID(form.ItemID)
 	if currentItem == nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": fmt.Sprintf("can't find an instruction with the ID %s", form.ItemID),
+			"error":  fmt.Sprintf("can't find an instruction with the ID %s", form.ItemID),
+			"method": "sendCommandHandler",
 		})
 		return
 	}
 
-	//var currentItem *SayWithMotionItem
-	//for _, session := range sessions {
-	//	if session.ID == form.SessionID {
-	//		for _, sessionItem := range session.Items {
-	//			if sessionItem.ID == form.ItemID {
-	//				switch form.ItemType {
-	//				case "question":
-	//					currentItem = &sessionItem.Question
-	//				case "positive-answer":
-	//					currentItem = &sessionItem.PositiveAnswer
-	//				case "negative-answer":
-	//					currentItem = &sessionItem.NegativeAnswer
-	//				default:
-	//					c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": "unrecognized item type"})
-	//					return
-	//				}
-	//				break
-	//			}
-	//		}
-	//	}
-	//}
 	log.Printf("chosed item: %+v", currentItem)
-	if currentItem.Phrase == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": "a phrase must be present"})
+	if !currentItem.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": "got an invalid instruction"})
 		return
 	}
 
-	// TODO: process the command: play sounds locally, execute motions remotely
+	// TODO: process the command: execute motions remotely
 	// TODO: implement delay for some motions
 
 	c.JSON(http.StatusOK, gin.H{"message": "the command has been sent"})
