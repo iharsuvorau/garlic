@@ -32,7 +32,7 @@
                         JS script to mark it as "visited" or "active" */}}
                         <div class="session-item">
 
-                            <div id="{{.Question.ID}}" class="question say-move-item" data-itemid="{{.Question.ID}}">
+                            <div id="{{.Question.ID}}" class="question say-move-item instruction" data-itemid="{{.Question.ID}}">
                                 <p class="h6 bold caps" data-itemid="{{.Question.ID}}">Question {{$questionCounter}}</p>
                                 <div data-itemid="{{.Question.ID}}">
                                     <p class="h2 mb0" data-itemid="{{.Question.ID}}">{{.Question.SayItem.Phrase}}</p>
@@ -47,7 +47,7 @@
                                         {{end}}
                                     </p>
                                     {{/* Hidden from UI */}}
-                                    <audio id="audio-{{.Question.ID}}" src="/{{.Question.SayItem.FilePath}}">
+                                    <audio id="audio-{{.Question.ID}}" src="/{{.Question.SayItem.FilePath}}" data-itemid="{{.Question.ID}}">
                                         Your browser does not support the <code>audio</code> element.
                                     </audio>
                                 </div>
@@ -55,7 +55,7 @@
 
                             <div class="answers">
                                 {{if .PositiveAnswer}}
-                                    <div id="{{.PositiveAnswer.ID}}" class="positive-answer say-move-item" data-itemid="{{.PositiveAnswer.ID}}">
+                                    <div id="{{.PositiveAnswer.ID}}" class="positive-answer say-move-item instruction" data-itemid="{{.PositiveAnswer.ID}}">
                                         {{if .PositiveAnswer.SayItem}}
                                             <p class="h3 mb0 positive" data-itemid="{{.PositiveAnswer.ID}}">{{.PositiveAnswer.SayItem.Phrase}}</p>
                                         {{end}}
@@ -75,7 +75,7 @@
                                 {{end}}
 
                                 {{if .NegativeAnswer}}
-                                    <div id="{{.NegativeAnswer.ID}}" class="negative-answer say-move-item" data-itemid="{{.NegativeAnswer.ID}}">
+                                    <div id="{{.NegativeAnswer.ID}}" class="negative-answer say-move-item instruction" data-itemid="{{.NegativeAnswer.ID}}">
                                         {{if .NegativeAnswer.SayItem}}
                                             <p class="h3 mb0 negative" data-itemid="{{.NegativeAnswer.ID}}">{{.NegativeAnswer.SayItem.Phrase}}</p>
                                         {{end}}
@@ -100,26 +100,16 @@
                 {{end}}
             {{end}}
         </section>
-
-        <form action="/voice" method="post" style="display: none;">
-            <div class="field">
-                <label for="phrase">Phrase</label>
-                <input id="phrase" name="phrase" type="text">
-            </div>
-            <div class="field">
-                <input type="submit" value="Send"/>
-            </div>
-        </form>
     </section>
 
     <aside>
         <h2 class="h2">Motion Library</h2>
         {{range $group := .moveGroups}}
             <h3 class="h3">{{$group}}</h3>
-            <div class="motion-group">
-                {{range $.motions}}
+            <div class="move-group">
+                {{range $.moves}}
                     {{if eq $group .Group}}
-                        <div class="motion-item" id="{{.ID}}" data-itemid="{{.ID}}">{{.Name}}</div>
+                        <div class="move-item instruction" id="{{.ID}}" data-itemid="{{.ID}}">{{.Name}}</div>
                     {{end}}
                 {{end}}
             </div>

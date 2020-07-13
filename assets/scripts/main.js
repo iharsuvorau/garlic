@@ -1,6 +1,6 @@
 window.addEventListener('DOMContentLoaded', (event) => {
+    // rerouting on the select element choice
     const sessionList = document.getElementById("sessionList");
-
     if (sessionList) {
         sessionList.addEventListener("change", (event) => {
             let val = event.target.value;
@@ -8,14 +8,9 @@ window.addEventListener('DOMContentLoaded', (event) => {
         })
     }
 
-    const sayMoveItems = document.getElementsByClassName("say-move-item");
     const notifications = document.getElementById("notifications");
 
-    // creating an audio environment
-    const AudioContext = window.AudioContext || window.webkitAudioContext;  // for cross browser
-    let audioCtx, audioElement;
-    audioCtx = new AudioContext();
-
+    const sayMoveItems = document.getElementsByClassName("say-move-item");
     for (const item of sayMoveItems) {
         item.addEventListener("click", (event) => {
             // preparing request data
@@ -33,42 +28,30 @@ window.addEventListener('DOMContentLoaded', (event) => {
             }).then(response => {
                 return response.json();
             }).then(data => {
-                console.log(data);
-                let message = "error";
-                let notificationClass = "message";
                 if (data.message && data.message.length > 0) {
-                    // message for a notification in UI
-                    message = data.message;
-
                     // marking as "visited" and "active" in UI
                     markSessionItemActive(itemID, sayMoveItems);
 
                     // playing an audio
-                    audioElement = document.getElementById("audio-" + itemID);
+                    const audioElement = document.getElementById("audio-" + itemID);
                     if (audioElement) {
-                        try {
-                            audioElement.play()
-                        } catch (err) {
-                            console.error(err);
-                        }
+                        audioElement.play()
+                            .then(() => showNotifications("message", data.message, notifications))
+                            .catch(err => console.error(err));
                     }
                 } else if (data.error && data.error.length > 0) {
-                    message = data.error;
-                    notificationClass = "error";
+                    showNotifications("error", data.error, notifications);
                 }
-
-                showNotifications(notificationClass, message, notifications)
             }).catch(error => {
                 console.log("error:", error)
             })
         })
     }
 
-    // Motions
+    // Moves
 
-    const motionItems = document.getElementsByClassName("motion-item");
-
-    for (const item of motionItems) {
+    const moveItems = document.getElementsByClassName("move-item");
+    for (const item of moveItems) {
         item.addEventListener("click", (event) => {
             // preparing request data
             const itemID = event.target.dataset.itemid;
@@ -93,7 +76,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
                     message = data.message;
 
                     // marking as "visited" and "active" in UI
-                    markSessionItemActive(itemID, motionItems);
+                    markSessionItemActive(itemID, moveItems);
                 } else if (data.error && data.error.length > 0) {
                     message = data.error;
                     notificationClass = "error";

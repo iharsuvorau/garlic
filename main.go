@@ -43,28 +43,26 @@ func main() {
 
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	sessions, err = collectSessions(*sessionsDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	moves, err = collectMoves(*motionsDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	moveGroups = Moves(moves).GetGroups()
+	moveGroups = moves.GetGroups()
+
+	sessions, err = collectSessions(*sessionsDir, &moves)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Routes
 
 	r := gin.New()
-
 	r.SetFuncMap(template.FuncMap{
 		"plus":      plus,
 		"increment": increment,
 		"basename":  basename,
 	})
-
 	r.LoadHTMLGlob("templates/*.html")
 
 	// JSON: robot API
@@ -78,7 +76,7 @@ func main() {
 	// HTML: user GUI
 	r.GET("/sessions/:id", sessionsHandler)
 	r.GET("/sessions/", sessionsHandler)
-	r.GET("/manual/", pageHandler("Manual"))
+	//r.GET("/manual/", pageHandler("Manual"))
 	r.GET("/about/", pageHandler("About"))
 	r.GET("/", homeHandler)
 
@@ -124,14 +122,14 @@ func sendCommandHandler(c *gin.Context) {
 	log.Printf("form: %+v", form)
 
 	// We can receive two types of instructions: SayCommand and MoveCommand. In the first case,
-	//we just respond with OK status and the web browser will play an audio file for the
-	//instruction. If something is wrong, we reply with error and the sound won't be played. In the second case,
-	//we push the motion command to a web socket for Pepper to execute.
+	// we just respond with OK status and the web browser will play an audio file for the
+	// instruction. If something is wrong, we reply with error and the sound won't be played. In the second case,
+	// we push the motion command to a web socket for Pepper to execute.
 
 	var curInstruction Instruction
 	curInstruction = Sessions(sessions).GetInstructionByID(form.ItemID)
 	if curInstruction.IsNil() {
-		curInstruction = Moves(moves).GetByID(form.ItemID)
+		curInstruction = moves.GetByID(form.ItemID)
 	}
 
 	if curInstruction.IsNil() {
@@ -155,11 +153,9 @@ func sendCommandHandler(c *gin.Context) {
 	// TODO: process the command: execute moves remotely
 	// TODO: implement delay for some moves
 
-	switch curInstruction.Command() {
-	case MoveCommand:
-		log.Println("push to the web socket")
-	case SayAndMoveCommand:
-		log.Println("say through browser and push to the web socket")
+	if err = sendInstruction(curInstruction, wsConnection); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "the command has been sent"})
@@ -241,11 +237,11 @@ var siteMenuItems = []*MenuItem{
 		Link:     "/sessions/",
 		IsActive: false,
 	},
-	{
-		Title:    "Manual",
-		Link:     "/manual/",
-		IsActive: false,
-	},
+	//{
+	//	Title:    "Manual",
+	//	Link:     "/manual/",
+	//	IsActive: false,
+	//},
 	{
 		Title:    "About",
 		Link:     "/about/",
