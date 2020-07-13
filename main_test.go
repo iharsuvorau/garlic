@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -33,5 +34,38 @@ func Test_collectMotions(t *testing.T) {
 				t.Errorf("collectMoves() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_PepperTaskMarshal(t *testing.T) {
+	var err error
+
+	moves, err = collectMoves("data/pepper-core-anims-master")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sessions, err = collectSessions("data", &moves)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	content, err := sessions[0].Items[0].Question.MoveItem.Content()
+	if err != nil {
+		t.Fatalf("path: %v, err: %v", sessions[0].Items[0].Question.MoveItem.FilePath, err)
+	}
+
+	tt := PepperMessage{
+		Command: sessions[0].Items[0].Question.MoveItem.Command(),
+		Content: content,
+	}
+
+	b, err := json.Marshal(tt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(b) == 0 {
+		t.Fatal("nil bytes")
 	}
 }

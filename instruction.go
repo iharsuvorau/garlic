@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"time"
@@ -14,12 +16,32 @@ import (
 
 type Instruction interface {
 	Command() Command
-	Content() []byte
+	Content() ([]byte, error)
 	GetID() uuid.UUID
 	SetID(uuid.UUID)
 	String() string
 	IsValid() bool
 	IsNil() bool
+}
+
+type PepperMessage struct {
+	Command Command `json:"command"`
+	Content []byte  `json:"content"`
+}
+
+func (pm *PepperMessage) MarshalJSON() ([]byte, error) {
+	v := map[string]interface{}{
+		"command": pm.Command.String(),
+		"content": string(pm.Content),
+	}
+	return json.Marshal(v)
+}
+
+func MustBytes(b []byte, err error) []byte {
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // sendInstruction sends an instruction via a web socket.
@@ -28,12 +50,7 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		return fmt.Errorf("websocket connection is nil, Pepper must initiate it first")
 	}
 
-	type payload struct {
-		command Command
-		content []byte
-	}
-
-	send := func(p payload, connection *websocket.Conn) error {
+	send := func(p PepperMessage, connection *websocket.Conn) error {
 		b, err := json.Marshal(p)
 		if err != nil {
 			return err
@@ -42,30 +59,34 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 	}
 
 	if instruction.Command() == SayAndMoveCommand { // unpacking the wrapper and sending two actions sequentially
+		// NOTE: actually, we send only a motion now, because audio is played via a speaker from a local computer
 		cmd := instruction.(*SayAndMoveAction)
+		time.Sleep(cmd.MoveItem.Delay) // delay specified by a user
 
-		say := payload{
-			command: cmd.SayItem.Command(),
-			content: cmd.SayItem.Content(),
-		}
-
-		move := payload{
-			command: cmd.MoveItem.Command(),
-			content: cmd.MoveItem.Content(),
-		}
-
-		if err := send(say, connection); err != nil {
+		content, err := cmd.MoveItem.Content()
+		if err != nil {
 			return err
+		}
+
+		move := PepperMessage{
+			Command: cmd.MoveItem.Command(),
+			Content: content,
 		}
 
 		if err := send(move, connection); err != nil {
 			return err
 		}
 	} else { // just sending the instruction
-		return send(payload{
-			command: instruction.Command(),
-			content: instruction.Content(),
-		}, connection)
+		content, err := instruction.Content()
+		if err != nil {
+			return err
+		}
+
+		move := PepperMessage{
+			Command: instruction.Command(),
+			Content: content,
+		}
+		return send(move, connection)
 	}
 
 	return nil
@@ -119,8 +140,8 @@ func (item *SayAndMoveAction) Command() Command {
 	return SayAndMoveCommand
 }
 
-func (item *SayAndMoveAction) Content() []byte {
-	return []byte{}
+func (item *SayAndMoveAction) Content() (b []byte, err error) {
+	return
 }
 
 func (item *SayAndMoveAction) String() string {
@@ -160,12 +181,12 @@ func (item *SayAction) Command() Command {
 	return SayCommand
 }
 
-func (item *SayAction) Content() []byte {
+func (item *SayAction) Content() (b []byte, err error) {
 	if item.IsNil() {
-		return []byte{}
+		return b, fmt.Errorf("nil item")
 	}
 
-	return []byte(filepath.Base(item.FilePath))
+	return []byte(filepath.Base(item.Phrase)), nil
 }
 
 func (item *SayAction) String() string {
@@ -213,6 +234,15 @@ func (mm Moves) GetByID(id uuid.UUID) *MoveAction {
 	return nil
 }
 
+func (mm Moves) GetByName(name string) *MoveAction {
+	for _, v := range mm {
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
+
 func (mm Moves) GetGroups() []string {
 	var groupsMap = map[string]interface{}{}
 
@@ -247,12 +277,18 @@ func (item *MoveAction) Command() Command {
 	return MoveCommand
 }
 
-func (item *MoveAction) Content() []byte {
+func (item *MoveAction) Content() (b []byte, err error) {
 	if item.IsNil() {
-		return []byte{}
+		return b, fmt.Errorf("nil item")
 	}
 
-	return []byte(filepath.Base(item.FilePath))
+	f, err := os.Open(item.FilePath)
+	defer f.Close()
+	if err != nil {
+		return b, err
+	}
+
+	return ioutil.ReadAll(f)
 }
 
 func (item *MoveAction) String() string {
