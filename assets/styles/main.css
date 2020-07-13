@@ -160,3 +160,28 @@ p {
 .notification-item.error::before {
     content: "ERROR: ";
 }
+
+/*Motions*/
+
+.motion-group {
+    /*display: flex;*/
+    /*flex-wrap: wrap;*/
+
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: .3rem;
+}
+
+.motion-item {
+    /*width: 5rem;*/
+    border: 1px solid beige;
+    padding: .4rem;
+    word-wrap: break-word;
+
+    cursor: pointer;
+    background: ivory;
+}
+
+.motion-item:hover {
+    background: beige;
+}

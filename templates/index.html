@@ -25,48 +25,73 @@
         <section class="session">
             {{range .sessions}}
                 {{if eq .ID $.currentSessionID}}
-                    {{$sessionID := .ID}}
                     {{$questionCounter := 0}}
                     {{range .Items}}
                         {{$questionCounter = ($questionCounter | increment)}}
                         {{/* each HTML element must have an ID in order to be recognized and be found later in the
                         JS script to mark it as "visited" or "active" */}}
-                        <div class="session-item" id="{{.ID}}" data-itemid="{{.ID}}">
+                        <div class="session-item">
 
-                            <div id="{{.Question.ID}}" class="question session-item-element" data-itemid="{{.Question.ID}}">
+                            <div id="{{.Question.ID}}" class="question say-move-item" data-itemid="{{.Question.ID}}">
                                 <p class="h6 bold caps" data-itemid="{{.Question.ID}}">Question {{$questionCounter}}</p>
                                 <div data-itemid="{{.Question.ID}}">
-                                    <p class="h2 mb0" data-itemid="{{.Question.ID}}">{{.Question.Phrase}}</p>
-                                    <p class="h6" data-itemid="{{.Question.ID}}"><span class="bold">audio</span>: {{.Question.AudioFilePath | basename}}
-                                        <br/><span class="bold">motion</span>: {{.Question.MotionName}}{{if .Question.MotionDelay}} <span class="bold">with delay</span> of {{.Question.MotionDelay}}{{end}}</p>
-                                    <audio id="audio-{{.Question.ID}}" src="/{{.Question.AudioFilePath}}">Your
-                                        browser does not support the <code>audio</code> element.</audio>
+                                    <p class="h2 mb0" data-itemid="{{.Question.ID}}">{{.Question.SayItem.Phrase}}</p>
+                                    <p class="h6" data-itemid="{{.Question.ID}}">
+                                        <span class="bold">audio</span>: {{.Question.SayItem.FilePath | basename}}
+                                        <br/>
+                                        {{if .Question.MoveItem}}
+                                            <span class="bold">motion</span>: {{.Question.MoveItem.Name}}
+                                            {{if.Question.MoveItem.Delay}}
+                                                <span class="bold">with delay</span> of {{.Question.MoveItem.Delay}}
+                                            {{end}}
+                                        {{end}}
+                                    </p>
+                                    {{/* Hidden from UI */}}
+                                    <audio id="audio-{{.Question.ID}}" src="/{{.Question.SayItem.FilePath}}">
+                                        Your browser does not support the <code>audio</code> element.
+                                    </audio>
                                 </div>
                             </div>
 
                             <div class="answers">
                                 {{if .PositiveAnswer}}
-                                <div id="{{.PositiveAnswer.ID}}" class="positive-answer session-item-element"
-                                     data-itemid="{{.PositiveAnswer.ID}}">
-                                    {{if .PositiveAnswer.Phrase}}
-                                    <p class="h3 mb0 positive" data-itemid="{{.PositiveAnswer.ID}}">{{.PositiveAnswer.Phrase}}</p>
-                                    {{end}}
-                                    <p class="h6" data-itemid="{{.PositiveAnswer.ID}}">{{if .PositiveAnswer.AudioFilePath}}audio: {{.PositiveAnswer.AudioFilePath | basename}}
-                                        <br/>{{end}}{{if .PositiveAnswer.MotionName}}motion: {{.PositiveAnswer.MotionName}}{{end}}</p>
-                                    <audio id="audio-{{.PositiveAnswer.ID}}" src="/{{.Question.AudioFilePath}}">Your
-                                        browser does not support the <code>audio</code> element.</audio>
-                                </div>
+                                    <div id="{{.PositiveAnswer.ID}}" class="positive-answer say-move-item" data-itemid="{{.PositiveAnswer.ID}}">
+                                        {{if .PositiveAnswer.SayItem}}
+                                            <p class="h3 mb0 positive" data-itemid="{{.PositiveAnswer.ID}}">{{.PositiveAnswer.SayItem.Phrase}}</p>
+                                        {{end}}
+                                        <p class="h6" data-itemid="{{.PositiveAnswer.ID}}">
+                                            {{if .PositiveAnswer.SayItem.FilePath}}
+                                                audio: {{.PositiveAnswer.SayItem.FilePath | basename}}<br/>
+                                            {{end}}
+                                            {{if .PositiveAnswer.MoveItem}}
+                                                motion: {{.PositiveAnswer.MoveItem.Name}}
+                                            {{end}}
+                                        </p>
+                                        {{/* Hidden from UI */}}
+                                        <audio id="audio-{{.PositiveAnswer.ID}}" src="/{{.Question.SayItem.FilePath}}">
+                                            Your browser does not support the <code>audio</code> element.
+                                        </audio>
+                                    </div>
                                 {{end}}
 
                                 {{if .NegativeAnswer}}
-                                <div id="{{.NegativeAnswer.ID}}" class="negative-answer session-item-element" data-itemid="{{.NegativeAnswer.ID}}">
-                                    {{if .NegativeAnswer.Phrase}}
-                                    <p class="h3 mb0 negative" data-itemid="{{.NegativeAnswer.ID}}">{{.NegativeAnswer.Phrase}}</p>
-                                    {{end}}
-                                    <p class="h6" data-itemid="{{.NegativeAnswer.ID}}">{{if .NegativeAnswer.AudioFilePath}}audio: {{.NegativeAnswer.AudioFilePath | basename}}
-                                        <br/>{{end}}{{if .NegativeAnswer.MotionName}}motion: {{.NegativeAnswer.MotionName}}{{end}}</p>
-                                    <audio id="audio-{{.PositiveAnswer.ID}}" src="/{{.NegativeAnswer.AudioFilePath}}">Your browser does not support the <code>audio</code> element.</audio>
-                                </div>
+                                    <div id="{{.NegativeAnswer.ID}}" class="negative-answer say-move-item" data-itemid="{{.NegativeAnswer.ID}}">
+                                        {{if .NegativeAnswer.SayItem}}
+                                            <p class="h3 mb0 negative" data-itemid="{{.NegativeAnswer.ID}}">{{.NegativeAnswer.SayItem.Phrase}}</p>
+                                        {{end}}
+                                        <p class="h6" data-itemid="{{.NegativeAnswer.ID}}">
+                                            {{if .NegativeAnswer.SayItem.FilePath}}
+                                                audio: {{.NegativeAnswer.SayItem.FilePath | basename}}<br/>
+                                            {{end}}
+                                            {{if .NegativeAnswer.MoveItem}}
+                                                motion: {{.NegativeAnswer.MoveItem.Name}}
+                                            {{end}}
+                                        </p>
+                                        {{/* Hidden from UI */}}
+                                        <audio id="audio-{{.PositiveAnswer.ID}}" src="/{{.NegativeAnswer.SayItem.FilePath}}">
+                                            Your browser does not support the <code>audio</code> element.
+                                        </audio>
+                                    </div>
                                 {{end}}
                             </div>
 
@@ -86,8 +111,19 @@
             </div>
         </form>
     </section>
+
     <aside>
         <h2 class="h2">Motion Library</h2>
+        {{range $group := .moveGroups}}
+            <h3 class="h3">{{$group}}</h3>
+            <div class="motion-group">
+                {{range $.motions}}
+                    {{if eq $group .Group}}
+                        <div class="motion-item" id="{{.ID}}" data-itemid="{{.ID}}">{{.Name}}</div>
+                    {{end}}
+                {{end}}
+            </div>
+        {{end}}
     </aside>
 </main>
 {{template "body-bottom" .}}

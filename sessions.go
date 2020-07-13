@@ -4,10 +4,215 @@ import (
 	"github.com/google/uuid"
 	"os"
 	"path"
-	"regexp"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
+// sessions represent all sessions available and is the main type for a user which simplifies
+// the control of a Pepper robot.
+var sessions []*Session
+
+// moves represent all ready-made moves located somewhere on the disk. This presented in the
+// web UI as a library of moves which can be called any time by a user.
+var moves []*MoveAction
+
+// moveGroups is a helper variable for the "/sessions/" route to list moves by a group.
+var moveGroups []string
+
+func collectSessions(dataDir string) ([]*Session, error) {
+	var sessions = []*Session{
+		{
+			Name: "Session 1",
+			Items: []*SessionItem{
+				{
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase:   "Tere, mina olen robot Pepper. Mina olen 6-aastane ja tahan sinuga tuttavaks saada. Mis on sinu nimi?",
+							FilePath: "1out_tutvustus.wav",
+						},
+						MoveItem: &MoveAction{
+							Name:  "hello_a010.qianim",
+							Delay: 0,
+						},
+					},
+					PositiveAnswer: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase: "OK",
+						},
+					},
+					NegativeAnswer: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase: "Not OK",
+						},
+					},
+				},
+				{
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase:   "Kui vana sa oled?",
+							FilePath: "2out_vanus.wav",
+						},
+						MoveItem: &MoveAction{
+							Name:  "question_right_hand_a001.qianim",
+							Delay: 0,
+						},
+					},
+				},
+				{
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase:   "Kas Sul on vendi või õdesid?",
+							FilePath: "3out_vennad.wav",
+						},
+						MoveItem: &MoveAction{
+							Name:  "question_both_hands_a007.qianim",
+							Delay: 0,
+						},
+					},
+				},
+				{
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase:   "Ma tulin siia üksi, kuid mu pere on suur ja mööda maailma laiali.",
+							FilePath: "3out_vennadVV.wav",
+						},
+						MoveItem: &MoveAction{
+							Name:  "both_hands_high_b001.qianim",
+							Delay: 0,
+						},
+					},
+				},
+				{
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase:   "Mina olen pärit Pariisist ja nüüd meeldib mulle väga Eestis elada. Mis sulle Sinu Eestimaa juures meeldib?",
+							FilePath: "4out_päritolu.wav",
+						},
+						MoveItem: &MoveAction{
+							Name:  "exclamation_both_hands_a001.qianim",
+							Delay: time.Second * 5,
+						},
+					},
+				},
+				{
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase:   "Jaa, see on väike ja sõbralik maa ja teil on 4 aastaaega",
+							FilePath: "5out_eestimaavastus.wav",
+						},
+						MoveItem: &MoveAction{
+							Name:  "affirmation_a009",
+							Delay: 0,
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:   uuid.Must(uuid.NewRandom()),
+			Name: "Session 2",
+			Items: []*SessionItem{
+				{
+					ID: uuid.Must(uuid.NewRandom()),
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase: "Q1",
+						},
+					},
+				},
+				{
+					ID: uuid.Must(uuid.NewRandom()),
+					Question: &SayAndMoveAction{
+						SayItem: &SayAction{
+							Phrase: "Q2",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, s := range sessions {
+		s.ID = uuid.Must(uuid.NewRandom())
+
+		for _, item := range s.Items {
+			// initiate unique IDs
+			item.Question.SetID(uuid.Must(uuid.NewRandom()))
+			if !item.Question.IsNil() {
+				item.Question.SayItem.SetID(uuid.Must(uuid.NewRandom()))
+				item.Question.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
+			}
+
+			item.PositiveAnswer.SetID(uuid.Must(uuid.NewRandom()))
+			if !item.PositiveAnswer.IsNil() {
+				item.PositiveAnswer.SayItem.SetID(uuid.Must(uuid.NewRandom()))
+				item.PositiveAnswer.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
+			}
+
+			item.NegativeAnswer.SetID(uuid.Must(uuid.NewRandom()))
+			if !item.NegativeAnswer.IsNil() {
+				item.NegativeAnswer.SayItem.SetID(uuid.Must(uuid.NewRandom()))
+				item.NegativeAnswer.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
+			}
+
+			if item.Question != nil && item.Question.SayItem.FilePath != "" {
+				item.Question.SayItem.FilePath = path.Join(dataDir, s.Name, item.Question.SayItem.FilePath)
+				if _, err := os.Stat(item.Question.SayItem.FilePath); os.IsNotExist(err) {
+					return nil, err
+				}
+			}
+			if item.PositiveAnswer != nil && item.PositiveAnswer.SayItem.FilePath != "" {
+				item.PositiveAnswer.SayItem.FilePath = path.Join(dataDir, s.Name,
+					item.PositiveAnswer.SayItem.FilePath)
+				if _, err := os.Stat(item.PositiveAnswer.SayItem.FilePath); os.IsNotExist(err) {
+					return nil, err
+				}
+			}
+			if item.NegativeAnswer != nil && item.NegativeAnswer.SayItem.FilePath != "" {
+				item.NegativeAnswer.SayItem.FilePath = path.Join(dataDir, s.Name, item.NegativeAnswer.SayItem.FilePath)
+				if _, err := os.Stat(item.NegativeAnswer.SayItem.FilePath); os.IsNotExist(err) {
+					return nil, err
+				}
+			}
+		}
+	}
+	return sessions, nil
+}
+
+func collectMoves(dataDir string) ([]*MoveAction, error) {
+	query := path.Join(dataDir, "**/*.qianim")
+	matches, err := filepath.Glob(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var items = make([]*MoveAction, len(matches))
+	for i := range matches {
+		// parsing the parent folder as a motion group name
+		parts := strings.Split(matches[i], "/")
+		parent := parts[len(parts)-2]
+
+		// parsing the basename as a motion name
+		basename := parts[len(parts)-1]
+		name := strings.Replace(basename, filepath.Ext(basename), "", 1)
+
+		// appending a motion
+		items[i] = &MoveAction{
+			ID:       uuid.Must(uuid.NewRandom()),
+			FilePath: matches[i],
+			Group:    parent,
+			Name:     name,
+		}
+	}
+
+	return items, err
+}
+
+// Session
+
+// Session represents a session with a child, a set of questions and simple answers which
+// are accompanied with moves by a robot to make the conversation a lively one.
 type Session struct {
 	ID          uuid.UUID
 	Name        string
@@ -15,48 +220,21 @@ type Session struct {
 	Items       []*SessionItem
 }
 
-type SessionItem struct {
-	ID             uuid.UUID
-	Question       *SayWithMotionItem
-	PositiveAnswer *SayWithMotionItem
-	NegativeAnswer *SayWithMotionItem
-}
-
-type SayWithMotionItem struct {
-	ID            uuid.UUID
-	Phrase        string
-	AudioFilePath string
-	MotionName    string
-	MotionDelay   time.Duration
-}
-
-func (item *SayWithMotionItem) IsValid() bool {
-	if item.Phrase == "" || !IsValidUUID(item.ID.String()) || item.AudioFilePath == "" {
-		return false
-	}
-	return true
-}
-
-func IsValidUUID(uuid string) bool {
-	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
-	return r.MatchString(uuid)
-}
-
+// Sessions is a wrapper struct around an array of sessions with helpful methods.
 type Sessions []*Session
 
-func (ss Sessions) GetSayWithMotionItemByID(id uuid.UUID) *SayWithMotionItem {
+// GetInstructionByID looks for a top level instruction, which unites Say and Move actions
+// and presents them as a union of two actions, so both actions should be executed.
+func (ss Sessions) GetInstructionByID(id uuid.UUID) Instruction {
 	for _, session := range ss {
 		for _, item := range session.Items {
-
-			if item.NegativeAnswer != nil && item.NegativeAnswer.ID == id {
+			if !item.NegativeAnswer.IsNil() && item.NegativeAnswer.GetID() == id {
 				return item.NegativeAnswer
 			}
-
-			if item.PositiveAnswer != nil && item.PositiveAnswer.ID == id {
+			if !item.PositiveAnswer.IsNil() && item.PositiveAnswer.GetID() == id {
 				return item.PositiveAnswer
 			}
-
-			if item.Question != nil && item.Question.ID == id {
+			if !item.Question.IsNil() && item.Question.GetID() == id {
 				return item.Question
 			}
 		}
@@ -64,137 +242,11 @@ func (ss Sessions) GetSayWithMotionItemByID(id uuid.UUID) *SayWithMotionItem {
 	return nil
 }
 
-var sessions = []*Session{
-	{
-		ID:   uuid.Must(uuid.NewRandom()),
-		Name: "Session 1",
-		Items: []*SessionItem{
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Tere, mina olen robot Pepper. Mina olen 6-aastane ja tahan sinuga tuttavaks saada. Mis on sinu nimi?",
-					AudioFilePath: "1out_tutvustus.wav",
-					MotionName:    "hello_a010.qianim",
-					MotionDelay:   0,
-				},
-				PositiveAnswer: &SayWithMotionItem{
-					ID:          uuid.Must(uuid.NewRandom()),
-					Phrase:      "OK",
-					MotionDelay: 0,
-				},
-				NegativeAnswer: &SayWithMotionItem{
-					ID:          uuid.Must(uuid.NewRandom()),
-					Phrase:      "Not OK",
-					MotionDelay: 0,
-				},
-			},
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Kui vana sa oled?",
-					AudioFilePath: "2out_vanus.wav",
-					MotionName:    "question_right_hand_a001.qianim",
-					MotionDelay:   0,
-				},
-				PositiveAnswer: &SayWithMotionItem{
-					ID:          uuid.Must(uuid.NewRandom()),
-					Phrase:      "OK",
-					MotionDelay: 0,
-				},
-				NegativeAnswer: &SayWithMotionItem{
-					ID:          uuid.Must(uuid.NewRandom()),
-					Phrase:      "Not OK",
-					MotionDelay: 0,
-				},
-			},
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Kas Sul on vendi või õdesid?",
-					AudioFilePath: "3out_vennad.wav",
-					MotionName:    "question_both_hands_a007.qianim",
-					MotionDelay:   0,
-				},
-			},
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Ma tulin siia üksi, kuid mu pere on suur ja mööda maailma laiali.",
-					AudioFilePath: "3out_vennadVV.wav",
-					MotionName:    "both_hands_high_b001.qianim",
-					MotionDelay:   0,
-				},
-			},
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Mina olen pärit Pariisist ja nüüd meeldib mulle väga Eestis elada. Mis sulle Sinu Eestimaa juures meeldib?",
-					AudioFilePath: "4out_päritolu.wav",
-					MotionName:    "exclamation_both_hands_a001.qianim",
-					MotionDelay:   time.Second * 5,
-				},
-			},
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:            uuid.Must(uuid.NewRandom()),
-					Phrase:        "Jaa, see on väike ja sõbralik maa ja teil on 4 aastaaega",
-					AudioFilePath: "5out_eestimaavastus.wav",
-					MotionName:    "affirmation_a009",
-					MotionDelay:   0,
-				},
-			},
-		},
-	},
-	{
-		ID:   uuid.Must(uuid.NewRandom()),
-		Name: "Session 2",
-		Items: []*SessionItem{
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:     uuid.Must(uuid.NewRandom()),
-					Phrase: "Q1",
-				},
-			},
-			{
-				ID: uuid.Must(uuid.NewRandom()),
-				Question: &SayWithMotionItem{
-					ID:     uuid.Must(uuid.NewRandom()),
-					Phrase: "Q2",
-				},
-			},
-		},
-	},
-}
-
-func initSessions(sessions []*Session, dataDir string) error {
-	for _, s := range sessions {
-		for _, item := range s.Items {
-			if item.Question != nil && item.Question.AudioFilePath != "" {
-				item.Question.AudioFilePath = path.Join(dataDir, s.Name, item.Question.AudioFilePath)
-				if _, err := os.Stat(item.Question.AudioFilePath); os.IsNotExist(err) {
-					return err
-				}
-			}
-			if item.PositiveAnswer != nil && item.PositiveAnswer.AudioFilePath != "" {
-				item.PositiveAnswer.AudioFilePath = path.Join(dataDir, s.Name, item.PositiveAnswer.AudioFilePath)
-				if _, err := os.Stat(item.PositiveAnswer.AudioFilePath); os.IsNotExist(err) {
-					return err
-				}
-			}
-			if item.NegativeAnswer != nil && item.NegativeAnswer.AudioFilePath != "" {
-				item.NegativeAnswer.AudioFilePath = path.Join(dataDir, s.Name, item.NegativeAnswer.AudioFilePath)
-				if _, err := os.Stat(item.NegativeAnswer.AudioFilePath); os.IsNotExist(err) {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+// SessionItem represents a single unit of a session, it's a question and positive and negative
+// answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
+type SessionItem struct {
+	ID             uuid.UUID
+	Question       Instruction
+	PositiveAnswer Instruction
+	NegativeAnswer Instruction
 }

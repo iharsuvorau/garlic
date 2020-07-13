@@ -8,7 +8,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
         })
     }
 
-    const sessionItemElements = document.getElementsByClassName("session-item-element");
+    const sayMoveItems = document.getElementsByClassName("say-move-item");
     const notifications = document.getElementById("notifications");
 
     // creating an audio environment
@@ -16,7 +16,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
     let audioCtx, audioElement;
     audioCtx = new AudioContext();
 
-    for (const item of sessionItemElements) {
+    for (const item of sayMoveItems) {
         item.addEventListener("click", (event) => {
             // preparing request data
             const itemID = event.target.dataset.itemid;
@@ -41,7 +41,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
                     message = data.message;
 
                     // marking as "visited" and "active" in UI
-                    markSessionItemActive(itemID, sessionItemElements);
+                    markSessionItemActive(itemID, sayMoveItems);
 
                     // playing an audio
                     audioElement = document.getElementById("audio-" + itemID);
@@ -52,6 +52,48 @@ window.addEventListener('DOMContentLoaded', (event) => {
                             console.error(err);
                         }
                     }
+                } else if (data.error && data.error.length > 0) {
+                    message = data.error;
+                    notificationClass = "error";
+                }
+
+                showNotifications(notificationClass, message, notifications)
+            }).catch(error => {
+                console.log("error:", error)
+            })
+        })
+    }
+
+    // Motions
+
+    const motionItems = document.getElementsByClassName("motion-item");
+
+    for (const item of motionItems) {
+        item.addEventListener("click", (event) => {
+            // preparing request data
+            const itemID = event.target.dataset.itemid;
+            const requestData = {
+                "item_id": itemID,
+            };
+            console.log("request:", requestData);
+
+            // requesting the JSON API
+            fetch("/pepper/send_command", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(requestData)
+            }).then(response => {
+                return response.json();
+            }).then(data => {
+                console.log(data);
+                let message = "error";
+                let notificationClass = "message";
+                if (data.message && data.message.length > 0) {
+                    // message for a notification in UI
+                    message = data.message;
+
+                    // marking as "visited" and "active" in UI
+                    markSessionItemActive(itemID, motionItems);
                 } else if (data.error && data.error.length > 0) {
                     message = data.error;
                     notificationClass = "error";

@@ -30,17 +30,30 @@ var (
 // CLI arguments
 var (
 	servingAddr = flag.String("addr", ":8080", "http service address")
-	dataDir     = flag.String("data", "data", "path to the folder with sessions data")
+	sessionsDir = flag.String("data", "data", "path to the folder with sessions data")
+	motionsDir  = flag.String("moves", "data/pepper-core-anims-master", "path to the folder with moves")
 )
 
 func main() {
 	flag.Parse()
 
 	// Initialization of essential variables
+
+	var err error
+
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	if err := initSessions(sessions, *dataDir); err != nil {
+
+	sessions, err = collectSessions(*sessionsDir)
+	if err != nil {
 		log.Fatal(err)
 	}
+
+	moves, err = collectMoves(*motionsDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	moveGroups = Moves(moves).GetGroups()
 
 	// Routes
 
@@ -60,10 +73,9 @@ func main() {
 
 	// Static assets
 	r.Static("/assets/", "assets")
-	r.Static(fmt.Sprintf("/%s/", *dataDir), *dataDir)
+	r.Static(fmt.Sprintf("/%s/", *sessionsDir), *sessionsDir)
 
 	// HTML: user GUI
-	r.POST("/voice", voiceHandler)
 	r.GET("/sessions/:id", sessionsHandler)
 	r.GET("/sessions/", sessionsHandler)
 	r.GET("/manual/", pageHandler("Manual"))
@@ -111,8 +123,18 @@ func sendCommandHandler(c *gin.Context) {
 
 	log.Printf("form: %+v", form)
 
-	currentItem := Sessions(sessions).GetSayWithMotionItemByID(form.ItemID)
-	if currentItem == nil {
+	// We can receive two types of instructions: SayCommand and MoveCommand. In the first case,
+	//we just respond with OK status and the web browser will play an audio file for the
+	//instruction. If something is wrong, we reply with error and the sound won't be played. In the second case,
+	//we push the motion command to a web socket for Pepper to execute.
+
+	var curInstruction Instruction
+	curInstruction = Sessions(sessions).GetInstructionByID(form.ItemID)
+	if curInstruction.IsNil() {
+		curInstruction = Moves(moves).GetByID(form.ItemID)
+	}
+
+	if curInstruction.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":  fmt.Sprintf("can't find an instruction with the ID %s", form.ItemID),
 			"method": "sendCommandHandler",
@@ -120,14 +142,25 @@ func sendCommandHandler(c *gin.Context) {
 		return
 	}
 
-	log.Printf("chosed item: %+v", currentItem)
-	if !currentItem.IsValid() {
-		c.JSON(http.StatusBadRequest, gin.H{"method": "sendCommandHandler", "error": "got an invalid instruction"})
+	if !curInstruction.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":  "got an invalid instruction",
+			"method": "sendCommandHandler",
+		})
 		return
 	}
 
-	// TODO: process the command: execute motions remotely
-	// TODO: implement delay for some motions
+	log.Printf("curInstruction: %s", curInstruction)
+
+	// TODO: process the command: execute moves remotely
+	// TODO: implement delay for some moves
+
+	switch curInstruction.Command() {
+	case MoveCommand:
+		log.Println("push to the web socket")
+	case SayAndMoveCommand:
+		log.Println("say through browser and push to the web socket")
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "the command has been sent"})
 }
@@ -144,37 +177,13 @@ func initiateHandler(c *gin.Context) {
 	}
 }
 
-func voiceHandler(c *gin.Context) {
-	var form VoiceForm
-	if err := c.Bind(&form); err != nil {
-		c.String(http.StatusBadRequest, "Wrong user input")
-		return
-	}
-
-	task := PepperTask{
-		Command: "say",
-		Content: form.Phrase,
-	}
-	if err := task.Send(); err != nil {
-		c.String(http.StatusInternalServerError, "Task has failed: %s", err.Error())
-		return
-	}
-
-	c.String(http.StatusOK, "Task has been sent")
-}
-
 func sessionsHandler(c *gin.Context) {
 	activeMenu("Sessions", siteMenuItems)
 
 	var curSessionID uuid.UUID
 	var curSessionName string
-	//var err error
 
 	curSessionID, _ = uuid.Parse(c.Param("id"))
-	//if err != nil {
-	//	c.JSON(http.StatusBadRequest, gin.H{"method": "sessionsHandler", "error": "session id is not an instance of UUID"})
-	//	return
-	//}
 
 	for _, v := range sessions {
 		if v.ID == curSessionID {
@@ -188,6 +197,8 @@ func sessionsHandler(c *gin.Context) {
 		"currentSessionID":   curSessionID,
 		"currentSessionName": curSessionName,
 		"sessions":           sessions,
+		"moves":              moves,
+		"moveGroups":         moveGroups,
 		"siteMenu":           siteMenuItems,
 		"userMenu":           userMenuItems,
 	})
@@ -257,8 +268,4 @@ type SendCommandForm struct {
 	ItemID uuid.UUID `json:"item_id" binding:"required"`
 	// ItemType specifies on of the possible values: question, positive-answer, negative-answer.
 	//ItemType  string `json:"item_type" binding:"required"`
-}
-
-type VoiceForm struct {
-	Phrase string `form:"phrase" binding:"required"`
 }
