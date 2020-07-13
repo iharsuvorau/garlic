@@ -15,12 +15,12 @@ var sessions []*Session
 
 // moves represent all ready-made moves located somewhere on the disk. This presented in the
 // web UI as a library of moves which can be called any time by a user.
-var moves []*MoveAction
+var moves Moves
 
 // moveGroups is a helper variable for the "/sessions/" route to list moves by a group.
 var moveGroups []string
 
-func collectSessions(dataDir string) ([]*Session, error) {
+func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 	var sessions = []*Session{
 		{
 			Name: "Session 1",
@@ -32,18 +32,24 @@ func collectSessions(dataDir string) ([]*Session, error) {
 							FilePath: "1out_tutvustus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "hello_a010.qianim",
+							Name:  "Hello_01",
 							Delay: 0,
 						},
 					},
 					PositiveAnswer: &SayAndMoveAction{
 						SayItem: &SayAction{
-							Phrase: "OK",
+							Phrase: "Nice",
+						},
+						MoveItem: &MoveAction{
+							Name: "NiceReaction_01",
 						},
 					},
 					NegativeAnswer: &SayAndMoveAction{
 						SayItem: &SayAction{
-							Phrase: "Not OK",
+							Phrase: "Sad",
+						},
+						MoveItem: &MoveAction{
+							Name: "SadReaction_01",
 						},
 					},
 				},
@@ -54,7 +60,7 @@ func collectSessions(dataDir string) ([]*Session, error) {
 							FilePath: "2out_vanus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "question_right_hand_a001.qianim",
+							Name:  "Show_Hand_Right_02.qianim",
 							Delay: 0,
 						},
 					},
@@ -66,7 +72,7 @@ func collectSessions(dataDir string) ([]*Session, error) {
 							FilePath: "3out_vennad.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "question_both_hands_a007.qianim",
+							Name:  "Show_Hand_Both_02.qianim",
 							Delay: 0,
 						},
 					},
@@ -78,7 +84,7 @@ func collectSessions(dataDir string) ([]*Session, error) {
 							FilePath: "3out_vennadVV.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "both_hands_high_b001.qianim",
+							Name:  "Show_Hand_Both_01.qianim",
 							Delay: 0,
 						},
 					},
@@ -90,7 +96,7 @@ func collectSessions(dataDir string) ([]*Session, error) {
 							FilePath: "4out_päritolu.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "exclamation_both_hands_a001.qianim",
+							Name:  "Show_Self_01.qianim",
 							Delay: time.Second * 5,
 						},
 					},
@@ -102,7 +108,7 @@ func collectSessions(dataDir string) ([]*Session, error) {
 							FilePath: "5out_eestimaavastus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "affirmation_a009",
+							Name:  "NiceReaction_01.qianim",
 							Delay: 0,
 						},
 					},
@@ -156,23 +162,55 @@ func collectSessions(dataDir string) ([]*Session, error) {
 				item.NegativeAnswer.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
 			}
 
-			if item.Question != nil && item.Question.SayItem.FilePath != "" {
-				item.Question.SayItem.FilePath = path.Join(dataDir, s.Name, item.Question.SayItem.FilePath)
-				if _, err := os.Stat(item.Question.SayItem.FilePath); os.IsNotExist(err) {
-					return nil, err
+			if item.Question != nil {
+				if item.Question.SayItem.FilePath != "" {
+					item.Question.SayItem.FilePath = path.Join(sayDir, s.Name, item.Question.SayItem.FilePath)
+					if _, err := os.Stat(item.Question.SayItem.FilePath); os.IsNotExist(err) {
+						return nil, err
+					}
+				}
+
+				if item.Question.MoveItem != nil {
+					if v := moves.GetByName(item.Question.MoveItem.Name); v != nil {
+						m := *v                                // copy values from the library
+						m.Delay = item.Question.MoveItem.Delay // copy delay from a user provided variable
+						item.Question.MoveItem = &m
+					}
 				}
 			}
-			if item.PositiveAnswer != nil && item.PositiveAnswer.SayItem.FilePath != "" {
-				item.PositiveAnswer.SayItem.FilePath = path.Join(dataDir, s.Name,
-					item.PositiveAnswer.SayItem.FilePath)
-				if _, err := os.Stat(item.PositiveAnswer.SayItem.FilePath); os.IsNotExist(err) {
-					return nil, err
+
+			if item.PositiveAnswer != nil {
+				if item.PositiveAnswer.SayItem.FilePath != "" {
+					item.PositiveAnswer.SayItem.FilePath = path.Join(sayDir, s.Name,
+						item.PositiveAnswer.SayItem.FilePath)
+					if _, err := os.Stat(item.PositiveAnswer.SayItem.FilePath); os.IsNotExist(err) {
+						return nil, err
+					}
+				}
+
+				if item.PositiveAnswer.MoveItem != nil {
+					if v := moves.GetByName(item.PositiveAnswer.MoveItem.Name); v != nil {
+						m := *v                                      // copy values from the library
+						m.Delay = item.PositiveAnswer.MoveItem.Delay // copy delay from a user provided variable
+						item.PositiveAnswer.MoveItem = &m
+					}
 				}
 			}
-			if item.NegativeAnswer != nil && item.NegativeAnswer.SayItem.FilePath != "" {
-				item.NegativeAnswer.SayItem.FilePath = path.Join(dataDir, s.Name, item.NegativeAnswer.SayItem.FilePath)
-				if _, err := os.Stat(item.NegativeAnswer.SayItem.FilePath); os.IsNotExist(err) {
-					return nil, err
+
+			if item.NegativeAnswer != nil {
+				if item.NegativeAnswer.SayItem.FilePath != "" {
+					item.NegativeAnswer.SayItem.FilePath = path.Join(sayDir, s.Name, item.NegativeAnswer.SayItem.FilePath)
+					if _, err := os.Stat(item.NegativeAnswer.SayItem.FilePath); os.IsNotExist(err) {
+						return nil, err
+					}
+				}
+
+				if item.NegativeAnswer.MoveItem != nil {
+					if v := moves.GetByName(item.NegativeAnswer.MoveItem.Name); v != nil {
+						m := *v                                      // copy values from the library
+						m.Delay = item.NegativeAnswer.MoveItem.Delay // copy delay from a user provided variable
+						item.NegativeAnswer.MoveItem = &m
+					}
 				}
 			}
 		}
@@ -225,7 +263,7 @@ type Sessions []*Session
 
 // GetInstructionByID looks for a top level instruction, which unites Say and Move actions
 // and presents them as a union of two actions, so both actions should be executed.
-func (ss Sessions) GetInstructionByID(id uuid.UUID) Instruction {
+func (ss Sessions) GetInstructionByID(id uuid.UUID) *SayAndMoveAction {
 	for _, session := range ss {
 		for _, item := range session.Items {
 			if !item.NegativeAnswer.IsNil() && item.NegativeAnswer.GetID() == id {
@@ -246,7 +284,7 @@ func (ss Sessions) GetInstructionByID(id uuid.UUID) Instruction {
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
 	ID             uuid.UUID
-	Question       Instruction
-	PositiveAnswer Instruction
-	NegativeAnswer Instruction
+	Question       *SayAndMoveAction
+	PositiveAnswer *SayAndMoveAction
+	NegativeAnswer *SayAndMoveAction
 }
