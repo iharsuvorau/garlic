@@ -60,7 +60,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "2out_vanus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Hand_Right_02.qianim",
+							Name:  "Show_Hand_Right_02",
 							Delay: 0,
 						},
 					},
@@ -72,7 +72,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "3out_vennad.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Hand_Both_02.qianim",
+							Name:  "Show_Hand_Both_02",
 							Delay: 0,
 						},
 					},
@@ -84,7 +84,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "3out_vennadVV.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Hand_Both_01.qianim",
+							Name:  "Show_Hand_Both_01",
 							Delay: 0,
 						},
 					},
@@ -96,7 +96,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "4out_päritolu.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Self_01.qianim",
+							Name:  "Show_Self_01",
 							Delay: time.Second * 5,
 						},
 					},
@@ -108,7 +108,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "5out_eestimaavastus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "NiceReaction_01.qianim",
+							Name:  "NiceReaction_01",
 							Delay: 0,
 						},
 					},

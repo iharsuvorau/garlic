@@ -17,6 +17,7 @@ import (
 type Instruction interface {
 	Command() Command
 	Content() ([]byte, error)
+	DelayMillis() int64
 	GetID() uuid.UUID
 	SetID(uuid.UUID)
 	String() string
@@ -27,12 +28,14 @@ type Instruction interface {
 type PepperMessage struct {
 	Command Command `json:"command"`
 	Content []byte  `json:"content"`
+	Delay   int64   `json:"delay"`
 }
 
-func (pm *PepperMessage) MarshalJSON() ([]byte, error) {
+func (pm PepperMessage) MarshalJSON() ([]byte, error) {
 	v := map[string]interface{}{
 		"command": pm.Command.String(),
 		"content": string(pm.Content),
+		"delay":   pm.Delay,
 	}
 	return json.Marshal(v)
 }
@@ -53,7 +56,7 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 	send := func(p PepperMessage, connection *websocket.Conn) error {
 		b, err := json.Marshal(p)
 		if err != nil {
-			return err
+			return fmt.Errorf("can't marshal PepperMessage: %v", err)
 		}
 		return connection.WriteMessage(websocket.TextMessage, b)
 	}
@@ -61,16 +64,16 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 	if instruction.Command() == SayAndMoveCommand { // unpacking the wrapper and sending two actions sequentially
 		// NOTE: actually, we send only a motion now, because audio is played via a speaker from a local computer
 		cmd := instruction.(*SayAndMoveAction)
-		time.Sleep(cmd.MoveItem.Delay) // delay specified by a user
 
 		content, err := cmd.MoveItem.Content()
 		if err != nil {
-			return err
+			return fmt.Errorf("can't get content out of MoveItem: %v", err)
 		}
 
 		move := PepperMessage{
 			Command: cmd.MoveItem.Command(),
 			Content: content,
+			Delay:   cmd.MoveItem.DelayMillis(),
 		}
 
 		if err := send(move, connection); err != nil {
@@ -79,12 +82,13 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 	} else { // just sending the instruction
 		content, err := instruction.Content()
 		if err != nil {
-			return err
+			return fmt.Errorf("can't get content out of an instruction: %v", err)
 		}
 
 		move := PepperMessage{
 			Command: instruction.Command(),
 			Content: content,
+			Delay:   instruction.DelayMillis(),
 		}
 		return send(move, connection)
 	}
@@ -144,6 +148,10 @@ func (item *SayAndMoveAction) Content() (b []byte, err error) {
 	return
 }
 
+func (item *SayAndMoveAction) DelayMillis() int64 {
+	return 0
+}
+
 func (item *SayAndMoveAction) String() string {
 	if item == nil {
 		return ""
@@ -187,6 +195,10 @@ func (item *SayAction) Content() (b []byte, err error) {
 	}
 
 	return []byte(filepath.Base(item.Phrase)), nil
+}
+
+func (item *SayAction) DelayMillis() int64 {
+	return 0
 }
 
 func (item *SayAction) String() string {
@@ -289,6 +301,10 @@ func (item *MoveAction) Content() (b []byte, err error) {
 	}
 
 	return ioutil.ReadAll(f)
+}
+
+func (item *MoveAction) DelayMillis() int64 {
+	return item.Delay.Milliseconds()
 }
 
 func (item *MoveAction) String() string {
