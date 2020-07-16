@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -169,7 +170,28 @@ func initiateHandler(c *gin.Context) {
 	var err error
 	wsConnection, err = wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		return
+		log.Println(err)
+	}
+	defer wsConnection.Close()
+	for {
+		_, message, err := wsConnection.ReadMessage()
+		if err != nil {
+			log.Println("read:", err)
+			break
+		}
+
+		m := PepperIncomingMessage{}
+		err = json.Unmarshal(message, &m)
+		if err != nil {
+			log.Println("unmarshal:", err)
+		}
+		if len(m.Moves) > 0 {
+			log.Println("moves before", len(moves))
+			moves.AddMoves("Remote", m.Moves)
+			log.Println("new moves has been added")
+			log.Println("moves after", len(moves))
+			moveGroups = append(moveGroups, "Remote")
+		}
 	}
 }
 

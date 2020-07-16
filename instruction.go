@@ -18,6 +18,7 @@ type Instruction interface {
 	Command() Command
 	Content() ([]byte, error)
 	DelayMillis() int64
+	GetName() string
 	GetID() uuid.UUID
 	SetID(uuid.UUID)
 	String() string
@@ -25,9 +26,14 @@ type Instruction interface {
 	IsNil() bool
 }
 
+type PepperIncomingMessage struct {
+	Moves []string `json:"moves"`
+}
+
 type PepperMessage struct {
 	Command Command `json:"command"`
 	Content []byte  `json:"content"`
+	Name    string  `json:"name"`
 	Delay   int64   `json:"delay"`
 }
 
@@ -35,6 +41,7 @@ func (pm PepperMessage) MarshalJSON() ([]byte, error) {
 	v := map[string]interface{}{
 		"command": pm.Command.String(),
 		"content": string(pm.Content),
+		"name":    pm.Name,
 		"delay":   pm.Delay,
 	}
 	return json.Marshal(v)
@@ -65,13 +72,19 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		// NOTE: actually, we send only a motion now, because audio is played via a speaker from a local computer
 		cmd := instruction.(*SayAndMoveAction)
 
+		// first, trying to get the content of a file
 		content, err := cmd.MoveItem.Content()
-		if err != nil {
-			return fmt.Errorf("can't get content out of MoveItem: %v", err)
+		if err != nil && cmd.MoveItem.Name == "" {
+			// second, checking on the name presence and sending just a name,
+			// the move should be located on the Android app's side then
+			return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
+		} else {
+			err = nil
 		}
 
 		move := PepperMessage{
 			Command: cmd.MoveItem.Command(),
+			Name:    cmd.MoveItem.Name,
 			Content: content,
 			Delay:   cmd.MoveItem.DelayMillis(),
 		}
@@ -79,14 +92,34 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		if err := send(move, connection); err != nil {
 			return err
 		}
+
+		// if now file path, we don't have an audio locally, then send the phrase to the robot
+		if cmd.SayItem.FilePath == "" {
+			say := PepperMessage{
+				Command: cmd.SayItem.Command(),
+				Content: []byte(cmd.SayItem.Phrase),
+				Name:    "",
+				Delay:   0,
+			}
+
+			if err := send(say, connection); err != nil {
+				return err
+			}
+
+			return fmt.Errorf("sayItem doesn't have FilePath, command has been sent to the robot")
+		}
 	} else { // just sending the instruction
+		name := instruction.GetName()
 		content, err := instruction.Content()
-		if err != nil {
-			return fmt.Errorf("can't get content out of an instruction: %v", err)
+		if err != nil && name == "" {
+			return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
+		} else {
+			err = nil
 		}
 
 		move := PepperMessage{
 			Command: instruction.Command(),
+			Name:    name,
 			Content: content,
 			Delay:   instruction.DelayMillis(),
 		}
@@ -134,7 +167,7 @@ func (item *SayAndMoveAction) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
-	if item.SayItem.Phrase == "" || item.SayItem.FilePath == "" {
+	if item.SayItem.Phrase == "" {
 		return false
 	}
 	return true
@@ -175,6 +208,10 @@ func (item *SayAndMoveAction) GetID() uuid.UUID {
 		return uuid.UUID{}
 	}
 	return item.ID
+}
+
+func (item *SayAndMoveAction) GetName() string {
+	return item.MoveItem.Name
 }
 
 // SayAction implements Instruction
@@ -233,6 +270,10 @@ func (item *SayAction) GetID() uuid.UUID {
 	return item.ID
 }
 
+func (item *SayAction) GetName() string {
+	return ""
+}
+
 // MoveAction implements Instruction
 
 type Moves []*MoveAction
@@ -277,6 +318,18 @@ func (mm Moves) GetGroups() []string {
 	return groups
 }
 
+func (mm *Moves) AddMoves(groupName string, names []string) {
+	for _, n := range names {
+		*mm = append(*mm, &MoveAction{
+			ID:       uuid.Must(uuid.NewRandom()),
+			Name:     n,
+			FilePath: "",
+			Delay:    0,
+			Group:    groupName,
+		})
+	}
+}
+
 type MoveAction struct {
 	ID       uuid.UUID
 	Name     string
@@ -292,6 +345,10 @@ func (item *MoveAction) Command() Command {
 func (item *MoveAction) Content() (b []byte, err error) {
 	if item.IsNil() {
 		return b, fmt.Errorf("nil item")
+	}
+
+	if item.FilePath == "" {
+		return b, fmt.Errorf("FilePath is missing")
 	}
 
 	f, err := os.Open(item.FilePath)
@@ -321,9 +378,6 @@ func (item *MoveAction) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
-	if item.FilePath == "" {
-		return false
-	}
 	return true
 }
 
@@ -343,4 +397,8 @@ func (item *MoveAction) GetID() uuid.UUID {
 		return uuid.UUID{}
 	}
 	return item.ID
+}
+
+func (item *MoveAction) GetName() string {
+	return item.Name
 }

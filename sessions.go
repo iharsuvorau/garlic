@@ -32,13 +32,13 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "1out_tutvustus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Hello_01",
+							Name:  "hello_a010",
 							Delay: 0,
 						},
 					},
 					PositiveAnswer: &SayAndMoveAction{
 						SayItem: &SayAction{
-							Phrase: "Nice",
+							Phrase: "Very nice",
 						},
 						MoveItem: &MoveAction{
 							Name: "NiceReaction_01",
@@ -46,7 +46,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 					},
 					NegativeAnswer: &SayAndMoveAction{
 						SayItem: &SayAction{
-							Phrase: "Sad",
+							Phrase: "That is sad",
 						},
 						MoveItem: &MoveAction{
 							Name: "SadReaction_01",
@@ -60,7 +60,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "2out_vanus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Hand_Right_02",
+							Name:  "question_right_hand_a001",
 							Delay: 0,
 						},
 					},
@@ -72,7 +72,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "3out_vennad.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Hand_Both_02",
+							Name:  "question_both_hands_a007",
 							Delay: 0,
 						},
 					},
@@ -84,7 +84,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "3out_vennadVV.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Hand_Both_01",
+							Name:  "both_hands_high_b001",
 							Delay: 0,
 						},
 					},
@@ -96,7 +96,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "4out_päritolu.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "Show_Self_01",
+							Name:  "exclamation_both_hands_a001",
 							Delay: time.Second * 5,
 						},
 					},
@@ -108,7 +108,7 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 							FilePath: "5out_eestimaavastus.wav",
 						},
 						MoveItem: &MoveAction{
-							Name:  "NiceReaction_01",
+							Name:  "affirmation_a009",
 							Delay: 0,
 						},
 					},
@@ -171,6 +171,8 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 				}
 
 				if item.Question.MoveItem != nil {
+					// the move is found in the server's library, otherwise it should be present
+					// on the Android app's side
 					if v := moves.GetByName(item.Question.MoveItem.Name); v != nil {
 						m := *v                                // copy values from the library
 						m.Delay = item.Question.MoveItem.Delay // copy delay from a user provided variable
@@ -189,6 +191,8 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 				}
 
 				if item.PositiveAnswer.MoveItem != nil {
+					// the move is found in the server's library, otherwise it should be present
+					// on the Android app's side
 					if v := moves.GetByName(item.PositiveAnswer.MoveItem.Name); v != nil {
 						m := *v                                      // copy values from the library
 						m.Delay = item.PositiveAnswer.MoveItem.Delay // copy delay from a user provided variable
@@ -207,6 +211,8 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 
 				if item.NegativeAnswer.MoveItem != nil {
 					if v := moves.GetByName(item.NegativeAnswer.MoveItem.Name); v != nil {
+						// the move is found in the server's library, otherwise it should be present
+						// on the Android app's side
 						m := *v                                      // copy values from the library
 						m.Delay = item.NegativeAnswer.MoveItem.Delay // copy delay from a user provided variable
 						item.NegativeAnswer.MoveItem = &m
@@ -229,7 +235,7 @@ func collectMoves(dataDir string) ([]*MoveAction, error) {
 	for i := range matches {
 		// parsing the parent folder as a motion group name
 		parts := strings.Split(matches[i], "/")
-		parent := parts[len(parts)-2]
+		parent := parts[len(parts)-2] // TODO: windows error here
 
 		// parsing the basename as a motion name
 		basename := parts[len(parts)-1]

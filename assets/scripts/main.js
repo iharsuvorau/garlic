@@ -117,5 +117,5 @@ function showNotifications(label, message, notifications) {
     const timeoutID = window.setTimeout(() => {
         window.clearTimeout(timeoutID);
         notifications.removeChild(notification);
-    }, 1500);
+    }, 3000);
 }
