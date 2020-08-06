@@ -26,90 +26,102 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 			Name: "Session 1",
 			Items: []*SessionItem{
 				{
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase:   "Tere, mina olen robot Pepper. Mina olen 6-aastane ja tahan sinuga tuttavaks saada. Mis on sinu nimi?",
-							FilePath: "1out_tutvustus.wav",
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase:   "Tere, mina olen robot Pepper. Mina olen 6-aastane ja tahan sinuga tuttavaks saada. Mis on sinu nimi?",
+								FilePath: "1out_tutvustus.wav",
+							},
+							MoveItem: &MoveAction{
+								Name:  "hello_a010",
+								Delay: 0,
+							},
 						},
-						MoveItem: &MoveAction{
-							Name:  "hello_a010",
-							Delay: 0,
+						{
+							SayItem: &SayAction{
+								Phrase: "Very nice",
+							},
+							MoveItem: &MoveAction{
+								Name: "NiceReaction_01",
+							},
 						},
-					},
-					PositiveAnswer: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase: "Very nice",
-						},
-						MoveItem: &MoveAction{
-							Name: "NiceReaction_01",
-						},
-					},
-					NegativeAnswer: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase: "That is sad",
-						},
-						MoveItem: &MoveAction{
-							Name: "SadReaction_01",
-						},
-					},
-				},
-				{
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase:   "Kui vana sa oled?",
-							FilePath: "2out_vanus.wav",
-						},
-						MoveItem: &MoveAction{
-							Name:  "question_right_hand_a001",
-							Delay: 0,
+						{
+							SayItem: &SayAction{
+								Phrase: "That is sad",
+							},
+							MoveItem: &MoveAction{
+								Name: "SadReaction_01",
+							},
 						},
 					},
 				},
 				{
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase:   "Kas Sul on vendi või õdesid?",
-							FilePath: "3out_vennad.wav",
-						},
-						MoveItem: &MoveAction{
-							Name:  "question_both_hands_a007",
-							Delay: 0,
-						},
-					},
-				},
-				{
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase:   "Ma tulin siia üksi, kuid mu pere on suur ja mööda maailma laiali.",
-							FilePath: "3out_vennadVV.wav",
-						},
-						MoveItem: &MoveAction{
-							Name:  "both_hands_high_b001",
-							Delay: 0,
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase:   "Kui vana sa oled?",
+								FilePath: "2out_vanus.wav",
+							},
+							MoveItem: &MoveAction{
+								Name:  "question_right_hand_a001",
+								Delay: 0,
+							},
 						},
 					},
 				},
 				{
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase:   "Mina olen pärit Pariisist ja nüüd meeldib mulle väga Eestis elada. Mis sulle Sinu Eestimaa juures meeldib?",
-							FilePath: "4out_päritolu.wav",
-						},
-						MoveItem: &MoveAction{
-							Name:  "exclamation_both_hands_a001",
-							Delay: time.Second * 5,
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase:   "Kas Sul on vendi või õdesid?",
+								FilePath: "3out_vennad.wav",
+							},
+							MoveItem: &MoveAction{
+								Name:  "question_both_hands_a007",
+								Delay: 0,
+							},
 						},
 					},
 				},
 				{
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase:   "Jaa, see on väike ja sõbralik maa ja teil on 4 aastaaega",
-							FilePath: "5out_eestimaavastus.wav",
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase:   "Ma tulin siia üksi, kuid mu pere on suur ja mööda maailma laiali.",
+								FilePath: "3out_vennadVV.wav",
+							},
+							MoveItem: &MoveAction{
+								Name:  "both_hands_high_b001",
+								Delay: 0,
+							},
 						},
-						MoveItem: &MoveAction{
-							Name:  "affirmation_a009",
-							Delay: 0,
+					},
+				},
+				{
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase:   "Mina olen pärit Pariisist ja nüüd meeldib mulle väga Eestis elada. Mis sulle Sinu Eestimaa juures meeldib?",
+								FilePath: "4out_päritolu.wav",
+							},
+							MoveItem: &MoveAction{
+								Name:  "exclamation_both_hands_a001",
+								Delay: time.Second * 5,
+							},
+						},
+					},
+				},
+				{
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase:   "Jaa, see on väike ja sõbralik maa ja teil on 4 aastaaega",
+								FilePath: "5out_eestimaavastus.wav",
+							},
+							MoveItem: &MoveAction{
+								Name:  "affirmation_a009",
+								Delay: 0,
+							},
 						},
 					},
 				},
@@ -120,18 +132,20 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 			Name: "Session 2",
 			Items: []*SessionItem{
 				{
-					ID: uuid.Must(uuid.NewRandom()),
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase: "Q1",
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase: "Q1",
+							},
 						},
 					},
 				},
 				{
-					ID: uuid.Must(uuid.NewRandom()),
-					Question: &SayAndMoveAction{
-						SayItem: &SayAction{
-							Phrase: "Q2",
+					Actions: []*SayAndMoveAction{
+						{
+							SayItem: &SayAction{
+								Phrase: "Q2",
+							},
 						},
 					},
 				},
@@ -143,79 +157,36 @@ func collectSessions(sayDir string, moves *Moves) ([]*Session, error) {
 		s.ID = uuid.Must(uuid.NewRandom())
 
 		for _, item := range s.Items {
-			// initiate unique IDs
-			item.Question.SetID(uuid.Must(uuid.NewRandom()))
-			if !item.Question.IsNil() {
-				item.Question.SayItem.SetID(uuid.Must(uuid.NewRandom()))
-				item.Question.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
-			}
+			item.ID = uuid.Must(uuid.NewRandom()) // TODO: do we need ID for an item
 
-			item.PositiveAnswer.SetID(uuid.Must(uuid.NewRandom()))
-			if !item.PositiveAnswer.IsNil() {
-				item.PositiveAnswer.SayItem.SetID(uuid.Must(uuid.NewRandom()))
-				item.PositiveAnswer.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
-			}
+			for _, action := range item.Actions {
+				if action == nil {
+					continue
+				}
 
-			item.NegativeAnswer.SetID(uuid.Must(uuid.NewRandom()))
-			if !item.NegativeAnswer.IsNil() {
-				item.NegativeAnswer.SayItem.SetID(uuid.Must(uuid.NewRandom()))
-				item.NegativeAnswer.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
-			}
+				// setting IDs
+				action.SetID(uuid.Must(uuid.NewRandom()))
+				if !action.IsNil() {
+					action.SayItem.SetID(uuid.Must(uuid.NewRandom()))
+					action.MoveItem.SetID(uuid.Must(uuid.NewRandom()))
+				}
 
-			if item.Question != nil {
-				if item.Question.SayItem.FilePath != "" {
-					item.Question.SayItem.FilePath = path.Join(sayDir, s.Name, item.Question.SayItem.FilePath)
-					if _, err := os.Stat(item.Question.SayItem.FilePath); os.IsNotExist(err) {
+				// looking for audio files
+				if action.SayItem.FilePath != "" {
+					action.SayItem.FilePath = path.Join(sayDir, s.Name, action.SayItem.FilePath)
+					if _, err := os.Stat(action.SayItem.FilePath); os.IsNotExist(err) {
 						return nil, err
 					}
 				}
 
-				if item.Question.MoveItem != nil {
+				// looking for moves
+				if action.MoveItem != nil {
 					// the move is found in the server's library, otherwise it should be present
 					// on the Android app's side
-					if v := moves.GetByName(item.Question.MoveItem.Name); v != nil {
-						m := *v                                // copy values from the library
-						m.Delay = item.Question.MoveItem.Delay // copy delay from a user provided variable
-						item.Question.MoveItem = &m
-					}
-				}
-			}
-
-			if item.PositiveAnswer != nil {
-				if item.PositiveAnswer.SayItem.FilePath != "" {
-					item.PositiveAnswer.SayItem.FilePath = path.Join(sayDir, s.Name,
-						item.PositiveAnswer.SayItem.FilePath)
-					if _, err := os.Stat(item.PositiveAnswer.SayItem.FilePath); os.IsNotExist(err) {
-						return nil, err
-					}
-				}
-
-				if item.PositiveAnswer.MoveItem != nil {
-					// the move is found in the server's library, otherwise it should be present
-					// on the Android app's side
-					if v := moves.GetByName(item.PositiveAnswer.MoveItem.Name); v != nil {
-						m := *v                                      // copy values from the library
-						m.Delay = item.PositiveAnswer.MoveItem.Delay // copy delay from a user provided variable
-						item.PositiveAnswer.MoveItem = &m
-					}
-				}
-			}
-
-			if item.NegativeAnswer != nil {
-				if item.NegativeAnswer.SayItem.FilePath != "" {
-					item.NegativeAnswer.SayItem.FilePath = path.Join(sayDir, s.Name, item.NegativeAnswer.SayItem.FilePath)
-					if _, err := os.Stat(item.NegativeAnswer.SayItem.FilePath); os.IsNotExist(err) {
-						return nil, err
-					}
-				}
-
-				if item.NegativeAnswer.MoveItem != nil {
-					if v := moves.GetByName(item.NegativeAnswer.MoveItem.Name); v != nil {
-						// the move is found in the server's library, otherwise it should be present
-						// on the Android app's side
-						m := *v                                      // copy values from the library
-						m.Delay = item.NegativeAnswer.MoveItem.Delay // copy delay from a user provided variable
-						item.NegativeAnswer.MoveItem = &m
+					if v := moves.GetByName(action.MoveItem.Name); v != nil {
+						m := *v                         // copy values from the library
+						m.Delay = action.MoveItem.Delay // copy delay from a user provided variable
+						action.MoveItem = &m
 					}
 				}
 			}
@@ -272,14 +243,10 @@ type Sessions []*Session
 func (ss Sessions) GetInstructionByID(id uuid.UUID) *SayAndMoveAction {
 	for _, session := range ss {
 		for _, item := range session.Items {
-			if !item.NegativeAnswer.IsNil() && item.NegativeAnswer.GetID() == id {
-				return item.NegativeAnswer
-			}
-			if !item.PositiveAnswer.IsNil() && item.PositiveAnswer.GetID() == id {
-				return item.PositiveAnswer
-			}
-			if !item.Question.IsNil() && item.Question.GetID() == id {
-				return item.Question
+			for _, action := range item.Actions {
+				if !action.IsNil() && action.GetID() == id {
+					return action
+				}
 			}
 		}
 	}
@@ -289,8 +256,14 @@ func (ss Sessions) GetInstructionByID(id uuid.UUID) *SayAndMoveAction {
 // SessionItem represents a single unit of a session, it's a question and positive and negative
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
-	ID             uuid.UUID
-	Question       *SayAndMoveAction
-	PositiveAnswer *SayAndMoveAction
-	NegativeAnswer *SayAndMoveAction
+	ID      uuid.UUID
+	Actions []*SayAndMoveAction // the first item of Actions is the main item, usually, it's the main question
+	// of the session item, other actions are some kind of conversation supportive answers
 }
+
+//type SessionItem struct {
+//	ID             uuid.UUID
+//	Question       *SayAndMoveAction
+//	PositiveAnswer *SayAndMoveAction
+//	NegativeAnswer *SayAndMoveAction
+//}
