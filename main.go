@@ -65,6 +65,7 @@ func main() {
 		"basename":  basename,
 	})
 	r.LoadHTMLGlob("templates/*.html")
+	r.Use(allowCORS)
 
 	// JSON: robot API
 	r.GET("/pepper/initiate", initiateHandler)
@@ -74,6 +75,12 @@ func main() {
 	r.Static("/assets/", "assets")
 	r.Static(fmt.Sprintf("/%s/", *sessionsDir), *sessionsDir)
 
+	// JSON: UI API
+	r.GET("/api/sessions/", sessionsJSONHandler)
+	r.GET("/api/moves/", movesJSONHandler)
+	r.GET("/api/move_groups/", moveGroupsJSONHandler)
+	//r.GET("/api/auth/", authJSONHandler)
+
 	// HTML: user GUI
 	r.GET("/sessions/:id", sessionsHandler)
 	r.GET("/sessions/", sessionsHandler)
@@ -82,6 +89,10 @@ func main() {
 	r.GET("/", homeHandler)
 
 	log.Fatal(r.Run(*servingAddr))
+}
+
+func allowCORS(c *gin.Context) {
+	c.Writer.Header().Add("Access-Control-Allow-Origin", "*")
 }
 
 // Template Helpers
@@ -219,6 +230,24 @@ func sessionsHandler(c *gin.Context) {
 		"moveGroups":         moveGroups,
 		"siteMenu":           siteMenuItems,
 		"userMenu":           userMenuItems,
+	})
+}
+
+func sessionsJSONHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"data": sessions,
+	})
+}
+
+func movesJSONHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"data": moves,
+	})
+}
+
+func moveGroupsJSONHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"data": moveGroups,
 	})
 }
 

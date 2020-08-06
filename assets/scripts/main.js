@@ -90,10 +90,6 @@ window.addEventListener('DOMContentLoaded', (event) => {
     }
 });
 
-function debug(label, content) {
-    console.log(label + ":", content);
-}
-
 function markSessionItemActive(itemID, items) {
     for (const item of items) {
         item.classList.remove("active");
