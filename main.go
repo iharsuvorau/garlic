@@ -77,6 +77,16 @@ func main() {
 
 	// JSON: UI API
 	r.GET("/api/sessions/", sessionsJSONHandler)
+	r.POST("/api/sessions/", createSessionJSONHandler)
+	r.GET("/api/sessions/:id", getSessionJSONHandler)
+	r.PUT("/api/sessions/:id", updateSessionJSONHandler)
+	r.DELETE("/api/sessions/:id", deleteSessionJSONHandler)
+	r.OPTIONS("/api/sessions/:id", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
+	//r.GET("/api/session_items/:id", getSessionItemJSONHandler)
+
 	r.GET("/api/moves/", movesJSONHandler)
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	//r.GET("/api/auth/", authJSONHandler)
@@ -93,6 +103,8 @@ func main() {
 
 func allowCORS(c *gin.Context) {
 	c.Writer.Header().Add("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Add("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+	c.Writer.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 }
 
 // Template Helpers
@@ -238,6 +250,90 @@ func sessionsJSONHandler(c *gin.Context) {
 		"data": sessions,
 	})
 }
+
+func updateSessionJSONHandler(c *gin.Context) {
+	//id := c.Param("id")
+	//session, err := Sessions(sessions).GetSessionByID(id)
+	//if err != nil {
+	//	c.JSON(http.StatusNotFound, gin.H{
+	//		"error": err.Error(),
+	//	})
+	//	return
+	//}
+
+	var updatedSession Session
+	err := c.BindJSON(&updatedSession)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err = Sessions(sessions).UpdateSessionByID(&updatedSession)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "session has been saved successfully",
+	})
+}
+
+func getSessionJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	session, err := Sessions(sessions).GetSessionByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": session,
+	})
+}
+
+func deleteSessionJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+
+	newSessions, err := Sessions(sessions).DeleteSessionByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	sessions = newSessions
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "session has been deleted",
+	})
+}
+
+func createSessionJSONHandler(c *gin.Context) {
+	log.Panic("not implemented")
+}
+
+//func getSessionItemJSONHandler(c *gin.Context) {
+//	id := c.Param("id")
+//	sessionItem, err := Sessions(sessions).GetItemByID(id)
+//	if err != nil {
+//		c.JSON(http.StatusNotFound, gin.H{
+//			"error": err.Error(),
+//		})
+//		return
+//	}
+//
+//	c.JSON(http.StatusOK, gin.H{
+//		"data": sessionItem,
+//	})
+//}
 
 func movesJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{

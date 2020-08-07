@@ -253,6 +253,78 @@ func (ss Sessions) GetInstructionByID(id uuid.UUID) *SayAndMoveAction {
 	return nil
 }
 
+func (ss Sessions) GetSessionByID(id string) (*Session, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range ss {
+		if s.ID == uid {
+			return s, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (ss Sessions) UpdateSessionByID(updatedSession *Session) error {
+	for _, item := range updatedSession.Items {
+		if (item.ID == uuid.UUID{}) {
+			item.ID = uuid.Must(uuid.NewRandom())
+		}
+
+		for _, action := range item.Actions {
+			if (action.ID == uuid.UUID{}) {
+				action.ID = uuid.Must(uuid.NewRandom())
+			}
+
+			if action.SayItem != nil {
+				if (action.SayItem.ID == uuid.UUID{}) {
+					action.SayItem.ID = uuid.Must(uuid.NewRandom())
+				}
+			}
+
+			if action.MoveItem != nil {
+				if (action.MoveItem.ID == uuid.UUID{}) {
+					action.MoveItem.ID = uuid.Must(uuid.NewRandom())
+				}
+			}
+		}
+	}
+
+	for _, s := range ss {
+		if s.ID == updatedSession.ID {
+			*s = *updatedSession
+		}
+	}
+
+	return nil
+}
+
+func (ss Sessions) DeleteSessionByID(id string) ([]*Session, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = ss.GetSessionByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	newSessions := []*Session{}
+
+	for _, s := range ss {
+		if s.ID == uid {
+			continue
+		}
+		newSessions = append(newSessions, s)
+	}
+
+	return newSessions, nil
+}
+
 // SessionItem represents a single unit of a session, it's a question and positive and negative
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
