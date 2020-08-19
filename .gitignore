@@ -1,4 +1,5 @@
 cert-gen
+data
+build
 server.crt
 server.key
-data
