@@ -292,6 +292,21 @@ func (mm Moves) GetByID(id uuid.UUID) *MoveAction {
 	return nil
 }
 
+func (mm Moves) GetByStringID(id string) (*MoveAction, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range mm {
+		if v.ID == uid {
+			return v, nil
+		}
+	}
+
+	return nil, fmt.Errorf("not found")
+}
+
 func (mm Moves) GetByName(name string) *MoveAction {
 	for _, v := range mm {
 		if v.Name == name {
