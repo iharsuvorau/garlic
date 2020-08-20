@@ -64,8 +64,18 @@ func (s *SessionStore) GetInstruction(id uuid.UUID) *SayAndMoveAction {
 	for _, session := range s.Sessions {
 		for _, item := range session.Items {
 			for _, action := range item.Actions {
-				if !action.IsNil() && action.GetID() == id {
+				if action == nil {
+					continue
+				}
+
+				if action.ID == id {
 					return action
+				}
+
+				if action.SayItem != nil {
+					if action.SayItem.ID == id || action.MoveItem.ID == id {
+						return action
+					}
 				}
 			}
 		}

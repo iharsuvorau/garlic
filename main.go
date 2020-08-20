@@ -70,12 +70,18 @@ func main() {
 	// JSON: robot API
 	r.GET("/pepper/initiate", initiateHandler)
 	r.POST("/pepper/send_command", sendCommandHandler)
+	r.OPTIONS("/pepper/send_command", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
 
 	// Static assets
 	r.Static("/assets/", "assets")
 	r.Static("/data", "data")
 
 	// JSON: UI API
+
+	r.GET("/api/pepper/status", pepperStatusJSONHandler)
+
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
 	r.OPTIONS("/api/sessions/", func(c *gin.Context) {
@@ -99,6 +105,10 @@ func main() {
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	//r.GET("/api/auth/", authJSONHandler)
 
+	r.GET("/", func(c *gin.Context) {
+		c.String(http.StatusOK, "home page")
+	})
+
 	log.Fatal(r.Run(*servingAddr))
 }
 
@@ -111,6 +121,14 @@ func allowCORS(c *gin.Context) {
 }
 
 // Handlers
+
+func pepperStatusJSONHandler(c *gin.Context) {
+	var status int8
+	if wsConnection != nil {
+		status = 1
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status})
+}
 
 func sendCommandHandler(c *gin.Context) {
 	var form SendCommandForm
@@ -142,12 +160,13 @@ func sendCommandHandler(c *gin.Context) {
 	var curInstruction Instruction
 	curInstruction = sessionsStore.GetInstruction(form.ItemID)
 	if curInstruction.IsNil() {
+		log.Printf("no ID in sessions store: %v", form.ItemID)
 		curInstruction = moves.GetByID(form.ItemID)
 	}
 
 	if curInstruction.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error":  fmt.Sprintf("can't find an instruction with the ID %s", form.ItemID),
+			"error":  fmt.Sprintf("can't find the instruction with the ID %s", form.ItemID),
 			"method": "sendCommandHandler",
 		})
 		return

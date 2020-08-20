@@ -99,20 +99,20 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		}
 
 		// if now file path, we don't have an audio locally, then send the phrase to the robot
-		if cmd.SayItem.FilePath == "" {
-			say := PepperMessage{
-				Command: cmd.SayItem.Command(),
-				Content: []byte(cmd.SayItem.Phrase),
-				Name:    "",
-				Delay:   0,
-			}
-
-			if err := send(say, connection); err != nil {
-				return err
-			}
-
-			return fmt.Errorf("sayItem doesn't have FilePath, command has been sent to the robot")
-		}
+		//if cmd.SayItem.FilePath == "" {
+		//	say := PepperMessage{
+		//		Command: cmd.SayItem.Command(),
+		//		Content: []byte(cmd.SayItem.Phrase),
+		//		Name:    "",
+		//		Delay:   0,
+		//	}
+		//
+		//	if err := send(say, connection); err != nil {
+		//		return err
+		//	}
+		//
+		//	return fmt.Errorf("sayItem doesn't have FilePath, command has been sent to the robot")
+		//}
 	} else { // just sending the instruction
 		name := instruction.GetName()
 		content, err := instruction.Content()
