@@ -33,7 +33,6 @@ var (
 // CLI arguments
 var (
 	servingAddr = flag.String("addr", ":8080", "http service address")
-	sessionsDir = flag.String("data", "data", "path to the folder with sessions data")
 	motionsDir  = flag.String("moves", "data/pepper-core-anims-master", "path to the folder with moves")
 )
 
@@ -69,18 +68,21 @@ func main() {
 
 	// JSON: robot API
 	r.GET("/pepper/initiate", initiateHandler)
-	r.POST("/pepper/send_command", sendCommandHandler)
-	r.OPTIONS("/pepper/send_command", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	//r.POST("/pepper/send_command", sendCommandHandler)
+	//r.OPTIONS("/pepper/send_command", func(c *gin.Context) {
+	//	c.String(http.StatusOK, "")
+	//})
 
 	// Static assets
-	r.Static("/assets/", "assets")
 	r.Static("/data", "data")
 
 	// JSON: UI API
 
 	r.GET("/api/pepper/status", pepperStatusJSONHandler)
+	r.POST("/api/pepper/send_command", sendCommandHandler)
+	r.OPTIONS("/api/pepper/send_command", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
 
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
@@ -106,7 +108,7 @@ func main() {
 	//r.GET("/api/auth/", authJSONHandler)
 
 	r.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "home page")
+		c.String(http.StatusOK, "Pepper webserver")
 	})
 
 	log.Fatal(r.Run(*servingAddr))
@@ -131,7 +133,9 @@ func pepperStatusJSONHandler(c *gin.Context) {
 }
 
 func sendCommandHandler(c *gin.Context) {
-	var form SendCommandForm
+	form := struct {
+		ItemID uuid.UUID `json:"item_id" binding:"required"`
+	}{}
 	err := c.BindJSON(&form)
 	if err != nil {
 		defer c.Request.Body.Close()
@@ -150,20 +154,16 @@ func sendCommandHandler(c *gin.Context) {
 		return
 	}
 
-	log.Printf("form: %+v", form)
-
 	// We can receive two types of instructions: SayCommand and MoveCommand. In the first case,
 	// we just respond with OK status and the web browser will play an audio file for the
 	// instruction. If something is wrong, we reply with error and the sound won't be played. In the second case,
 	// we push the motion command to a web socket for Pepper to execute.
-
 	var curInstruction Instruction
 	curInstruction = sessionsStore.GetInstruction(form.ItemID)
 	if curInstruction.IsNil() {
 		log.Printf("no ID in sessions store: %v", form.ItemID)
 		curInstruction = moves.GetByID(form.ItemID)
 	}
-
 	if curInstruction.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":  fmt.Sprintf("can't find the instruction with the ID %s", form.ItemID),
@@ -171,7 +171,6 @@ func sendCommandHandler(c *gin.Context) {
 		})
 		return
 	}
-
 	if !curInstruction.IsValid() {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":  "got an invalid instruction",
@@ -179,12 +178,6 @@ func sendCommandHandler(c *gin.Context) {
 		})
 		return
 	}
-
-	log.Printf("curInstruction: %s", curInstruction)
-
-	// TODO: process the command: execute moves remotely
-	// TODO: implement delay for some moves
-
 	if err = sendInstruction(curInstruction, wsConnection); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -359,13 +352,4 @@ func moveGroupsJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": moveGroups,
 	})
-}
-
-// Forms and JSON requests the app needs to handle
-
-type SendCommandForm struct {
-	//SessionID uuid.UUID  `json:"session_id" binding:"required"`
-	ItemID uuid.UUID `json:"item_id" binding:"required"`
-	// ItemType specifies on of the possible values: question, positive-answer, negative-answer.
-	//ItemType  string `json:"item_type" binding:"required"`
 }

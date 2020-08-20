@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 )
 
@@ -280,75 +279,6 @@ func (item *SayAction) GetName() string {
 }
 
 // MoveAction implements Instruction
-
-type Moves []*MoveAction
-
-func (mm Moves) GetByID(id uuid.UUID) *MoveAction {
-	for _, v := range mm {
-		if v.ID == id {
-			return v
-		}
-	}
-	return nil
-}
-
-func (mm Moves) GetByStringID(id string) (*MoveAction, error) {
-	uid, err := uuid.Parse(id)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, v := range mm {
-		if v.ID == uid {
-			return v, nil
-		}
-	}
-
-	return nil, fmt.Errorf("not found")
-}
-
-func (mm Moves) GetByName(name string) *MoveAction {
-	for _, v := range mm {
-		if v.Name == name {
-			return v
-		}
-	}
-	return nil
-}
-
-func (mm Moves) GetGroups() []string {
-	var groupsMap = map[string]interface{}{}
-
-	for _, v := range moves {
-		if v == nil {
-			continue
-		}
-
-		groupsMap[v.Group] = nil
-	}
-
-	var groups = make([]string, len(groupsMap))
-	var i int64 = 0
-	for k := range groupsMap {
-		groups[i] = k
-		i++
-	}
-	sort.Strings(groups)
-
-	return groups
-}
-
-func (mm *Moves) AddMoves(groupName string, names []string) {
-	for _, n := range names {
-		*mm = append(*mm, &MoveAction{
-			ID:       uuid.Must(uuid.NewRandom()),
-			Name:     n,
-			FilePath: "",
-			Delay:    0,
-			Group:    groupName,
-		})
-	}
-}
 
 type MoveAction struct {
 	ID       uuid.UUID
