@@ -13,16 +13,11 @@ import (
 
 // Instruction interface
 
-// TODO: Instruction interface looks overloaded, need to check the usage in shrink it.
-
 type Instruction interface {
 	Command() Command
 	Content() ([]byte, error)
 	DelayMillis() int64
 	GetName() string
-	GetID() uuid.UUID
-	SetID(uuid.UUID)
-	String() string
 	IsValid() bool
 	IsNil() bool
 }
@@ -200,20 +195,6 @@ func (item *SayAndMoveAction) IsNil() bool {
 	return item == nil
 }
 
-func (item *SayAndMoveAction) SetID(id uuid.UUID) {
-	if item == nil {
-		return
-	}
-	item.ID = id
-}
-
-func (item *SayAndMoveAction) GetID() uuid.UUID {
-	if item == nil {
-		return uuid.UUID{}
-	}
-	return item.ID
-}
-
 func (item *SayAndMoveAction) GetName() string {
 	return item.MoveItem.Name
 }
@@ -258,20 +239,6 @@ func (item *SayAction) IsValid() bool {
 
 func (item *SayAction) IsNil() bool {
 	return item == nil
-}
-
-func (item *SayAction) SetID(id uuid.UUID) {
-	if item == nil {
-		return
-	}
-	item.ID = id
-}
-
-func (item *SayAction) GetID() uuid.UUID {
-	if item == nil {
-		return uuid.UUID{}
-	}
-	return item.ID
 }
 
 func (item *SayAction) GetName() string {
@@ -333,20 +300,6 @@ func (item *MoveAction) IsValid() bool {
 
 func (item *MoveAction) IsNil() bool {
 	return item == nil
-}
-
-func (item *MoveAction) SetID(id uuid.UUID) {
-	if item == nil {
-		return
-	}
-	item.ID = id
-}
-
-func (item *MoveAction) GetID() uuid.UUID {
-	if item == nil {
-		return uuid.UUID{}
-	}
-	return item.ID
 }
 
 func (item *MoveAction) GetName() string {

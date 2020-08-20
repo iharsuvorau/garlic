@@ -161,7 +161,6 @@ func sendCommandHandler(c *gin.Context) {
 	var curInstruction Instruction
 	curInstruction = sessionsStore.GetInstruction(form.ItemID)
 	if curInstruction.IsNil() {
-		log.Printf("no ID in sessions store: %v", form.ItemID)
 		curInstruction = moves.GetByID(form.ItemID)
 	}
 	if curInstruction.IsNil() {
