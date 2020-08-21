@@ -3,7 +3,7 @@ package main
 //func TestSessionStore_Get(t *testing.T) {
 //	type fields struct {
 //		filepath string
-//		Sessions []*Session
+//		Moves []*Session
 //		mu       sync.RWMutex
 //	}
 //	type args struct {
@@ -22,7 +22,7 @@ package main
 //		t.Run(tt.name, func(t *testing.T) {
 //			s := &SessionStore{
 //				filepath: tt.fields.filepath,
-//				Sessions: tt.fields.Sessions,
+//				Moves: tt.fields.Moves,
 //				mu:       tt.fields.mu,
 //			}
 //			got, err := s.Get(tt.args.id)

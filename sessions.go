@@ -18,6 +18,45 @@ type Session struct {
 	Items       []*SessionItem `json:"Items" form:"Items"`
 }
 
+func (s *Session) initializeIDs() {
+	if s == nil {
+		return
+	}
+
+	if (s.ID == uuid.UUID{}) {
+		s.ID = uuid.Must(uuid.NewRandom())
+	}
+
+	for _, item := range s.Items {
+		if item == nil {
+			continue
+		}
+
+		if (item.ID == uuid.UUID{}) {
+			item.ID = uuid.Must(uuid.NewRandom())
+		}
+
+		for _, action := range item.Actions {
+			if action == nil {
+				continue
+			}
+			if (action.ID == uuid.UUID{}) {
+				action.ID = uuid.Must(uuid.NewRandom())
+			}
+			if action.SayItem != nil {
+				if (action.SayItem.ID == uuid.UUID{}) {
+					action.SayItem.ID = uuid.Must(uuid.NewRandom())
+				}
+			}
+			if action.MoveItem != nil {
+				if (action.MoveItem.ID == uuid.UUID{}) {
+					action.MoveItem.ID = uuid.Must(uuid.NewRandom())
+				}
+			}
+		}
+	}
+}
+
 // SessionItem represents a single unit of a session, it's a question and positive and negative
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
@@ -27,8 +66,9 @@ type SessionItem struct {
 }
 
 type SessionStore struct {
-	filepath string
 	Sessions []*Session
+
+	filepath string
 	mu       sync.RWMutex
 }
 
@@ -99,42 +139,18 @@ func (s *SessionStore) Get(id string) (*Session, error) {
 }
 
 func (s *SessionStore) Create(newSession *Session) error {
-	newSession.ID = uuid.Must(uuid.NewRandom())
+	newSession.initializeIDs()
 	s.Sessions = append(s.Sessions, newSession)
 	return s.dump()
 }
 
 func (s *SessionStore) Update(updatedSession *Session) error {
-	for _, item := range updatedSession.Items {
-		if (item.ID == uuid.UUID{}) {
-			item.ID = uuid.Must(uuid.NewRandom())
-		}
-
-		for _, action := range item.Actions {
-			if (action.ID == uuid.UUID{}) {
-				action.ID = uuid.Must(uuid.NewRandom())
-			}
-
-			if action.SayItem != nil {
-				if (action.SayItem.ID == uuid.UUID{}) {
-					action.SayItem.ID = uuid.Must(uuid.NewRandom())
-				}
-			}
-
-			if action.MoveItem != nil {
-				if (action.MoveItem.ID == uuid.UUID{}) {
-					action.MoveItem.ID = uuid.Must(uuid.NewRandom())
-				}
-			}
-		}
-	}
-
+	updatedSession.initializeIDs()
 	for _, s := range s.Sessions {
 		if s.ID == updatedSession.ID {
 			*s = *updatedSession
 		}
 	}
-
 	return s.dump()
 }
 
@@ -144,9 +160,23 @@ func (s *SessionStore) Delete(id string) error {
 		return err
 	}
 
-	_, err = s.Get(id)
+	session, err := s.Get(id)
 	if err != nil {
 		return err
+	}
+
+	// removing all audio files attached to the session
+	for _, item := range session.Items {
+		if item == nil {
+			continue
+		}
+		for _, action := range item.Actions {
+			if action.SayItem != nil && action.SayItem.FilePath != "" {
+				if err = os.Remove(action.SayItem.FilePath); err != nil {
+					return fmt.Errorf("failed to remove an audio file: %v", err)
+				}
+			}
+		}
 	}
 
 	newSessions := []*Session{}
@@ -158,7 +188,9 @@ func (s *SessionStore) Delete(id string) error {
 		newSessions = append(newSessions, s)
 	}
 
+	s.mu.Lock()
 	s.Sessions = newSessions
+	s.mu.Unlock()
 
 	return s.dump()
 }

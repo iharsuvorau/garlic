@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 // TODO: communicate over WSS
@@ -28,6 +29,7 @@ var (
 
 	fileStore     *FileStore
 	sessionsStore *SessionStore
+	moveStore     *MoveStore
 )
 
 // CLI arguments
@@ -45,12 +47,10 @@ func main() {
 
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	moves, err = collectMoves(*motionsDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	moveGroups = moves.GetGroups()
+	//moves, err = collectMoves(*motionsDir)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	fileStore = NewFileStore("data/uploads")
 
@@ -58,6 +58,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	moveStore, err = NewMoveStore("data/moves.json", *motionsDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("moves: %v", len(moveStore.Moves))
+
+	//moveGroups =  moveStore.GetGroups()
 
 	// Routes
 
@@ -102,8 +111,18 @@ func main() {
 		c.String(http.StatusOK, "")
 	})
 
+	r.POST("/api/upload/move", moveUploadJSONHandler)
+	r.OPTIONS("/api/upload/move", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
 	r.GET("/api/moves/", movesJSONHandler)
 	r.GET("/api/moves/:id", getMoveJSONHandler)
+	r.DELETE("/api/moves/:id", deleteMoveJSONHandler)
+	r.OPTIONS("/api/moves/:id", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	//r.GET("/api/auth/", authJSONHandler)
 
@@ -161,7 +180,7 @@ func sendCommandHandler(c *gin.Context) {
 	var curInstruction Instruction
 	curInstruction = sessionsStore.GetInstruction(form.ItemID)
 	if curInstruction.IsNil() {
-		curInstruction = moves.GetByID(form.ItemID)
+		curInstruction, _ = moveStore.GetByUUID(form.ItemID)
 	}
 	if curInstruction.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -186,6 +205,13 @@ func sendCommandHandler(c *gin.Context) {
 }
 
 func initiateHandler(c *gin.Context) {
+	// PepperIncomingMessage is used to parse requests from the Android application on the Pepper's side.
+	// It sends available built-in motions when starts itself, so the webserver can register these motions
+	// and give a user an option to use built-in motions.
+	type PepperIncomingMessage struct {
+		Moves []string `json:"moves"`
+	}
+
 	var err error
 	wsConnection, err = wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -205,11 +231,11 @@ func initiateHandler(c *gin.Context) {
 			log.Println("unmarshal:", err)
 		}
 		if len(m.Moves) > 0 {
-			log.Println("moves before", len(moves))
-			moves.AddMoves("Remote", m.Moves)
+			log.Println("moves before", len(moveStore.Moves))
+			moveStore.AddMany("Remote", m.Moves)
 			log.Println("new moves has been added")
-			log.Println("moves after", len(moves))
-			moveGroups = append(moveGroups, "Remote")
+			log.Println("moves after", len(moveStore.Moves))
+			//moveGroups = append(moveGroups, "Remote")
 		}
 	}
 }
@@ -326,15 +352,61 @@ func audioUploadJSONHandler(c *gin.Context) {
 	})
 }
 
+func moveUploadJSONHandler(c *gin.Context) {
+	// NOTE: using form data instead of JSON because of file upload in this handler
+
+	f, fh, err := c.Request.FormFile("file_content")
+	if err != nil {
+		log.Printf("moveUploadJSONHandler: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer f.Close()
+
+	uid := uuid.Must(uuid.NewRandom())
+	ext := filepath.Ext(fh.Filename)
+	name := uid.String() + ext
+	dst, err := fileStore.Save(name, f)
+	if err != nil {
+		log.Printf("moveUploadJSONHandler, can't save the file %v: %v", name, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	moveName := c.DefaultPostForm("name", "")
+	if moveName == "" {
+	}
+	moveName = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", 1)
+	moveGroup := c.DefaultPostForm("group", "")
+	if moveGroup == "" {
+		moveGroup = "Default"
+	}
+	move := &MoveAction{
+		ID:       uid,
+		Name:     moveName,
+		FilePath: dst,
+		Group:    moveGroup,
+	}
+	if err = moveStore.Create(move); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create a move: %v", err)})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "file has been uploaded successfully",
+		"id":       uid,
+		"filepath": dst,
+	})
+}
+
 func movesJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"data": moves,
+		"data": moveStore.Moves,
 	})
 }
 
 func getMoveJSONHandler(c *gin.Context) {
 	id := c.Param("id")
-	move, err := Moves(moves).GetByStringID(id)
+	move, err := moveStore.Get(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
@@ -347,8 +419,23 @@ func getMoveJSONHandler(c *gin.Context) {
 	})
 }
 
+func deleteMoveJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	err := moveStore.Delete(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "motion has been deleted successfully",
+	})
+}
+
 func moveGroupsJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"data": moveGroups,
+		"data": moveStore.GetGroups(),
 	})
 }

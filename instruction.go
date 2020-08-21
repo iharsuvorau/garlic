@@ -22,13 +22,6 @@ type Instruction interface {
 	IsNil() bool
 }
 
-// PepperIncomingMessage is used to parse requests from the Android application on the Pepper's side.
-// It sends available built-in motions when starts itself, so the webserver can register these motions
-// and give a user an option to use built-in motions.
-type PepperIncomingMessage struct {
-	Moves []string `json:"moves"`
-}
-
 type PepperMessage struct {
 	Command Command `json:"command"`
 	Content []byte  `json:"content"`
@@ -44,13 +37,6 @@ func (pm PepperMessage) MarshalJSON() ([]byte, error) {
 		"delay":   pm.Delay,
 	}
 	return json.Marshal(v)
-}
-
-func MustBytes(b []byte, err error) []byte {
-	if err != nil {
-		panic(err)
-	}
-	return b
 }
 
 // sendInstruction sends an instruction via a web socket.

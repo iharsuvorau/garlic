@@ -7,6 +7,13 @@ import (
 )
 
 func TestPepperMessage_MarshalJSON(t *testing.T) {
+	mustBytes := func(b []byte, err error) []byte {
+		if err != nil {
+			panic(err)
+		}
+		return b
+	}
+
 	type fields struct {
 		Command Command
 		Content []byte
@@ -25,7 +32,7 @@ func TestPepperMessage_MarshalJSON(t *testing.T) {
 				Content: []byte{},
 				Delay:   2000,
 			},
-			want:    MustBytes(json.Marshal(map[string]interface{}{"command": "move", "content": []byte{}, "delay": 2000})),
+			want:    mustBytes(json.Marshal(map[string]interface{}{"command": "move", "content": []byte{}, "delay": 2000})),
 			wantErr: false,
 		},
 		{
@@ -34,7 +41,7 @@ func TestPepperMessage_MarshalJSON(t *testing.T) {
 				Command: SayAndMoveCommand,
 				Content: []byte{},
 			},
-			want:    MustBytes(json.Marshal(map[string]interface{}{"command": "sayAndMove", "content": []byte{}, "delay": 0})),
+			want:    mustBytes(json.Marshal(map[string]interface{}{"command": "sayAndMove", "content": []byte{}, "delay": 0})),
 			wantErr: false,
 		},
 		{
@@ -43,7 +50,7 @@ func TestPepperMessage_MarshalJSON(t *testing.T) {
 				Command: SayCommand,
 				Content: []byte{},
 			},
-			want:    MustBytes(json.Marshal(map[string]interface{}{"command": "say", "content": []byte{}, "delay": 0})),
+			want:    mustBytes(json.Marshal(map[string]interface{}{"command": "say", "content": []byte{}, "delay": 0})),
 			wantErr: false,
 		},
 	}
