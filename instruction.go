@@ -191,6 +191,7 @@ type SayAction struct {
 	ID       uuid.UUID
 	Phrase   string
 	FilePath string
+	Delay    time.Duration
 }
 
 func (item *SayAction) Command() Command {
@@ -206,7 +207,7 @@ func (item *SayAction) Content() (b []byte, err error) {
 }
 
 func (item *SayAction) DelayMillis() int64 {
-	return 0
+	return item.Delay.Milliseconds()
 }
 
 func (item *SayAction) String() string {

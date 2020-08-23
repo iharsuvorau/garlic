@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -30,6 +29,7 @@ var (
 	fileStore     *FileStore
 	sessionsStore *SessionStore
 	moveStore     *MoveStore
+	pepperStatus  uint8 // 0 -- disconnected, 1 -- connected
 )
 
 // CLI arguments
@@ -64,7 +64,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("moves: %v", len(moveStore.Moves))
+	log.Printf("%v moves in the database", len(moveStore.Moves))
 
 	//moveGroups =  moveStore.GetGroups()
 
@@ -144,11 +144,7 @@ func allowCORS(c *gin.Context) {
 // Handlers
 
 func pepperStatusJSONHandler(c *gin.Context) {
-	var status int8
-	if wsConnection != nil {
-		status = 1
-	}
-	c.JSON(http.StatusOK, gin.H{"status": status})
+	c.JSON(http.StatusOK, gin.H{"status": pepperStatus})
 }
 
 func sendCommandHandler(c *gin.Context) {
@@ -218,24 +214,25 @@ func initiateHandler(c *gin.Context) {
 		log.Println(err)
 	}
 	defer wsConnection.Close()
+
+	pepperStatus = 1
+
+	wsConnection.SetCloseHandler(func(code int, text string) error {
+		log.Printf("websocket connection close handler: %v, %v", code, text)
+		pepperStatus = 0
+		return nil
+	})
+
 	for {
-		_, message, err := wsConnection.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
+		m := PepperIncomingMessage{}
+		if err := wsConnection.ReadJSON(&m); err != nil {
+			log.Printf("failed to read a message from Pepper: %v", err)
+			pepperStatus = 0
 			break
 		}
-
-		m := PepperIncomingMessage{}
-		err = json.Unmarshal(message, &m)
-		if err != nil {
-			log.Println("unmarshal:", err)
-		}
 		if len(m.Moves) > 0 {
-			log.Println("moves before", len(moveStore.Moves))
-			moveStore.AddMany("Remote", m.Moves)
-			log.Println("new moves has been added")
-			log.Println("moves after", len(moveStore.Moves))
-			//moveGroups = append(moveGroups, "Remote")
+			remoteMoves := makeMoveActionsFromNames(m.Moves, "Remote")
+			moveStore.AddMany(remoteMoves)
 		}
 	}
 }
@@ -372,11 +369,10 @@ func moveUploadJSONHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	moveName := c.DefaultPostForm("name", "")
 	if moveName == "" {
+		moveName = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", -1)
 	}
-	moveName = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", 1)
 	moveGroup := c.DefaultPostForm("group", "")
 	if moveGroup == "" {
 		moveGroup = "Default"
@@ -389,6 +385,7 @@ func moveUploadJSONHandler(c *gin.Context) {
 	}
 	if err = moveStore.Create(move); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create a move: %v", err)})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -438,4 +435,20 @@ func moveGroupsJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": moveStore.GetGroups(),
 	})
+}
+
+// Helpers
+
+func makeMoveActionsFromNames(names []string, group string) []*MoveAction {
+	moves := []*MoveAction{}
+	for _, n := range names {
+		moves = append(moves, &MoveAction{
+			ID:       uuid.Must(uuid.NewRandom()),
+			Name:     n,
+			FilePath: "",
+			Delay:    0,
+			Group:    group,
+		})
+	}
+	return moves
 }

@@ -33,7 +33,7 @@ func collectMoves(dataDir string) ([]*MoveAction, error) {
 		group := filepath.Base(dir)
 
 		// parsing the basename as a motion name
-		name := strings.Replace(basename, filepath.Ext(basename), "", 1)
+		name := strings.Replace(basename, filepath.Ext(basename), "", -1)
 
 		// appending a motion
 		items[i] = &MoveAction{
@@ -126,9 +126,12 @@ type MoveStore struct {
 }
 
 func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
+	var isFreshDatabase bool
+
 	var file *os.File
 	_, err := os.Stat(fpath)
 	if os.IsNotExist(err) {
+		isFreshDatabase = true
 		file, err = os.Create(fpath)
 		if err != nil {
 			return nil, fmt.Errorf("can't create a session store at %s: %v", fpath, err)
@@ -138,22 +141,19 @@ func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
 	}
 	defer file.Close()
 
-	moves := []*MoveAction{}
-	if err = json.NewDecoder(file).Decode(&moves); err != nil && err != io.EOF {
+	store := &MoveStore{filepath: fpath}
+	if err = json.NewDecoder(file).Decode(&store.Moves); err != nil && err != io.EOF {
 		return nil, fmt.Errorf("can't decode moves from %s: %v", fpath, err)
 	}
 
-	store := &MoveStore{
-		filepath: fpath,
-		Moves:    moves,
+	// collect provided moves only if there is no yet database created
+	if isFreshDatabase {
+		collected, err := collectMoves(providedMoves)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect provided moves: %v", err)
+		}
+		store.AddMany(collected)
 	}
-
-	// collect provided moves
-	collected, err := collectMoves(providedMoves)
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect provided moves: %v", err)
-	}
-	store.Moves = append(store.Moves, collected...)
 
 	return store, store.dump()
 }
@@ -161,6 +161,16 @@ func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
 func (s *MoveStore) GetByUUID(id uuid.UUID) (*MoveAction, error) {
 	for _, s := range s.Moves {
 		if s.ID == id {
+			return s, nil
+		}
+	}
+
+	return nil, fmt.Errorf("not found")
+}
+
+func (s *MoveStore) GetByName(name string) (*MoveAction, error) {
+	for _, s := range s.Moves {
+		if s.Name == name {
 			return s, nil
 		}
 	}
@@ -183,26 +193,45 @@ func (s *MoveStore) Get(id string) (*MoveAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *MoveStore) AddMany(groupName string, names []string) {
+//func (s *MoveStore) AddMany(groupName string, names []string) {
+//	s.mu.Lock()
+//	for _, n := range names {
+//		s.Moves = append(s.Moves, &MoveAction{
+//			ID:       uuid.Must(uuid.NewRandom()),
+//			Name:     n,
+//			FilePath: "",
+//			Delay:    0,
+//			Group:    groupName,
+//		})
+//	}
+//	s.mu.Unlock()
+//}
+
+// AddMany appends a move only if there is no another move with the same name and ID.
+func (s *MoveStore) AddMany(moves []*MoveAction) {
 	s.mu.Lock()
-	for _, n := range names {
-		s.Moves = append(s.Moves, &MoveAction{
-			ID:       uuid.Must(uuid.NewRandom()),
-			Name:     n,
-			FilePath: "",
-			Delay:    0,
-			Group:    groupName,
-		})
+	for _, m := range moves {
+		shouldAppend := true
+		for _, mm := range s.Moves {
+			if m.ID == mm.ID || m.Name == mm.Name {
+				shouldAppend = false
+				break
+			}
+		}
+		if shouldAppend {
+			s.Moves = append(s.Moves, m)
+		}
 	}
 	s.mu.Unlock()
 }
 
 func (s *MoveStore) Create(m *MoveAction) error {
-	m.ID = uuid.Must(uuid.NewRandom())
+	if (m.ID == uuid.UUID{}) {
+		return fmt.Errorf("failed to create a move: ID must be provided")
+	}
 
-	_, err := s.GetByUUID(m.ID)
-	if err == nil {
-		return fmt.Errorf("the move with such ID already exists: %v", m.ID)
+	if _, err := s.GetByName(m.Name); err == nil {
+		return fmt.Errorf("the move with such name already exists: %v", m.Name)
 	}
 
 	s.mu.Lock()
