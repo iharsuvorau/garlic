@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -47,11 +49,6 @@ func main() {
 
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	//moves, err = collectMoves(*motionsDir)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-
 	fileStore = NewFileStore("data/uploads")
 
 	sessionsStore, err = NewSessionStore("data/sessions.json")
@@ -63,10 +60,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Printf("%v moves in the database", len(moveStore.Moves))
 
-	//moveGroups =  moveStore.GetGroups()
+	if ip, err := externalIP(); err == nil {
+		log.Printf("IP of the machine: %v", ip)
+	} else {
+		log.Printf("failed to get IP of the machine: %v", err)
+	}
 
 	// Routes
 
@@ -451,4 +451,41 @@ func makeMoveActionsFromNames(names []string, group string) []*MoveAction {
 		})
 	}
 	return moves
+}
+
+func externalIP() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue // interface down
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue // loopback interface
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue // not an ipv4 address
+			}
+			return ip.String(), nil
+		}
+	}
+	return "", errors.New("are you connected to the network?")
 }

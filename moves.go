@@ -12,13 +12,6 @@ import (
 	"sync"
 )
 
-// moves represent all ready-made moves located somewhere on the disk. This presented in the
-// web UI as a library of moves which can be called any time by a user.
-//var moves Moves
-
-// moveGroups is a helper variable for the "/sessions/" route to list moves by a group.
-//var moveGroups []string
-
 func collectMoves(dataDir string) ([]*MoveAction, error) {
 	query := filepath.Join(dataDir, "**/*.qianim")
 	matches, err := filepath.Glob(query)
@@ -46,77 +39,6 @@ func collectMoves(dataDir string) ([]*MoveAction, error) {
 
 	return items, err
 }
-
-//type Moves []*MoveAction
-//
-//func (mm Moves) GetByID(id uuid.UUID) *MoveAction {
-//	for _, v := range mm {
-//		if v.ID == id {
-//			return v
-//		}
-//	}
-//	return nil
-//}
-//
-//func (mm Moves) GetByStringID(id string) (*MoveAction, error) {
-//	uid, err := uuid.Parse(id)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	for _, v := range mm {
-//		if v.ID == uid {
-//			return v, nil
-//		}
-//	}
-//
-//	return nil, fmt.Errorf("not found")
-//}
-//
-//func (mm Moves) GetByName(name string) *MoveAction {
-//	for _, v := range mm {
-//		if v.Name == name {
-//			return v
-//		}
-//	}
-//	return nil
-//}
-//
-//func (mm Moves) GetGroups() []string {
-//	var groupsMap = map[string]interface{}{}
-//
-//	for _, v := range moves {
-//		if v == nil {
-//			continue
-//		}
-//
-//		groupsMap[v.Group] = nil
-//	}
-//
-//	var groups = make([]string, len(groupsMap))
-//	var i int64 = 0
-//	for k := range groupsMap {
-//		groups[i] = k
-//		i++
-//	}
-//	sort.Strings(groups)
-//
-//	return groups
-//}
-//
-//func (mm *Moves) AddMoves(groupName string, names []string) {
-//	for _, n := range names {
-//		*mm = append(*mm, &MoveAction{
-//			ID:       uuid.Must(uuid.NewRandom()),
-//			Name:     n,
-//			FilePath: "",
-//			Delay:    0,
-//			Group:    groupName,
-//		})
-//	}
-//}
-
-//
 
 type MoveStore struct {
 	Moves []*MoveAction
@@ -192,20 +114,6 @@ func (s *MoveStore) Get(id string) (*MoveAction, error) {
 
 	return nil, fmt.Errorf("not found")
 }
-
-//func (s *MoveStore) AddMany(groupName string, names []string) {
-//	s.mu.Lock()
-//	for _, n := range names {
-//		s.Moves = append(s.Moves, &MoveAction{
-//			ID:       uuid.Must(uuid.NewRandom()),
-//			Name:     n,
-//			FilePath: "",
-//			Delay:    0,
-//			Group:    groupName,
-//		})
-//	}
-//	s.mu.Unlock()
-//}
 
 // AddMany appends a move only if there is no another move with the same name and ID.
 func (s *MoveStore) AddMany(moves []*MoveAction) {
