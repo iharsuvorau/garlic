@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"io"
+	"log"
 	"os"
 	"sync"
 )
@@ -138,6 +139,53 @@ func (s *SessionStore) Get(id string) (*Session, error) {
 	return nil, fmt.Errorf("not found")
 }
 
+func (s *SessionStore) GetItem(id string) (*SessionItem, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range s.Sessions {
+		for _, item := range s.Items {
+			if item.ID == uid {
+				return item, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("not found")
+}
+
+//func (s *SessionStore) FindAction(id string) (interface{}, error) {
+//	uid, err := uuid.Parse(id)
+//	if err != nil {
+//		return nil, err
+//	}
+//	for _, session := range s.Sessions {
+//		for _, item := range session.Items {
+//			if item == nil {
+//				continue
+//			}
+//			for _, action := range item.Actions {
+//				if action == nil {
+//					continue
+//				}
+//				if action.SayItem != nil {
+//					if action.SayItem.ID == uid {
+//						return action.SayItem, nil
+//					}
+//				}
+//				if action.MoveItem != nil {
+//					if action.MoveItem.ID == uid {
+//						return action.MoveItem, nil
+//					}
+//				}
+//			}
+//		}
+//	}
+//	return nil, fmt.Errorf("not found")
+//}
+
 func (s *SessionStore) Create(newSession *Session) error {
 	newSession.initializeIDs()
 	s.Sessions = append(s.Sessions, newSession)
@@ -173,7 +221,12 @@ func (s *SessionStore) Delete(id string) error {
 		for _, action := range item.Actions {
 			if action.SayItem != nil && action.SayItem.FilePath != "" {
 				if err = os.Remove(action.SayItem.FilePath); err != nil {
-					return fmt.Errorf("failed to remove an audio file: %v", err)
+					if os.IsNotExist(err) {
+						log.Printf("tried to remove unexistent file: %v", action.SayItem.FilePath)
+						err = nil
+					} else {
+						return fmt.Errorf("failed to remove an audio file: %v", err)
+					}
 				}
 			}
 		}
@@ -191,6 +244,47 @@ func (s *SessionStore) Delete(id string) error {
 	s.mu.Lock()
 	s.Sessions = newSessions
 	s.mu.Unlock()
+
+	return s.dump()
+}
+
+func (s *SessionStore) DeleteInstruction(id string) error {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+
+	// removing instruction's files
+	instruction := s.GetInstruction(uid)
+	if instruction != nil {
+		if instruction.SayItem != nil && len(instruction.SayItem.FilePath) > 0 {
+			err = os.Remove(instruction.SayItem.FilePath)
+			if err != nil {
+				log.Println(fmt.Errorf("failed to remove audio from the action: %v", err))
+			}
+		}
+	}
+
+	// removing the instruction
+	for _, session := range s.Sessions {
+		for _, item := range session.Items {
+			for _, instruction := range item.Actions {
+				if instruction.ID == uid {
+					newActions := []*SayAndMoveAction{}
+					for _, action := range item.Actions {
+						if action.ID == uid {
+							continue
+						}
+						newActions = append(newActions, action)
+					}
+					s.mu.Lock()
+					item.Actions = newActions
+					s.mu.Unlock()
+					break
+				}
+			}
+		}
+	}
 
 	return s.dump()
 }

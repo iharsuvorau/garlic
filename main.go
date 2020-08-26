@@ -31,6 +31,7 @@ var (
 	fileStore     *FileStore
 	sessionsStore *SessionStore
 	moveStore     *MoveStore
+	audioStore    *SayStore
 	pepperStatus  uint8 // 0 -- disconnected, 1 -- connected
 )
 
@@ -61,6 +62,11 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("%v moves in the database", len(moveStore.Moves))
+
+	audioStore, err = NewSayStore("data/audio.json")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if ip, err := externalIP(); err == nil {
 		log.Printf("IP of the machine: %v", ip)
@@ -106,6 +112,17 @@ func main() {
 		c.String(http.StatusOK, "")
 	})
 
+	r.GET("/api/session_items/:id", getSessionItemJSONHandler)
+	r.OPTIONS("/api/session_items/:id", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
+	r.GET("/api/instructions/:id", getInstructionJSONHandler)
+	r.DELETE("/api/instructions/:id", deleteInstructionJSONHandler)
+	r.OPTIONS("/api/instructions/:id", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
 	r.POST("/api/upload/audio", audioUploadJSONHandler)
 	r.OPTIONS("/api/upload/audio", func(c *gin.Context) {
 		c.String(http.StatusOK, "")
@@ -120,6 +137,17 @@ func main() {
 	r.GET("/api/moves/:id", getMoveJSONHandler)
 	r.DELETE("/api/moves/:id", deleteMoveJSONHandler)
 	r.OPTIONS("/api/moves/:id", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
+	r.GET("/api/audio/", audioJSONHandler)
+	r.POST("/api/audio/", createAudioJSONHandler)
+	r.OPTIONS("/api/audio/", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+	r.GET("/api/audio/:id", getAudioJSONHandler)
+	r.DELETE("/api/audio/:id", deleteAudioJSONHandler)
+	r.OPTIONS("/api/audio/:id", func(c *gin.Context) {
 		c.String(http.StatusOK, "")
 	})
 
@@ -342,8 +370,56 @@ func audioUploadJSONHandler(c *gin.Context) {
 		return
 	}
 
+	// NOTE: we don't create an object in SayStore, SayStore only for commonly used audio items,
+	// session audio items should belong only to a session.
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "file has been uploaded successfully",
+		"id":       uid,
+		"filepath": dst,
+	})
+}
+
+func createAudioJSONHandler(c *gin.Context) {
+	f, fh, err := c.Request.FormFile("file_content")
+	if err != nil {
+		log.Printf("createAudioJSONHandler: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer f.Close()
+
+	uid := uuid.Must(uuid.NewRandom())
+	ext := filepath.Ext(fh.Filename)
+	name := uid.String() + ext
+	dst, err := fileStore.Save(name, f)
+	if err != nil {
+		log.Printf("createAudioJSONHandler, can't save the file %v: %v", name, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	phrase := c.DefaultPostForm("phrase", "")
+	if phrase == "" {
+		phrase = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", -1)
+	}
+	group := c.DefaultPostForm("group", "")
+	if group == "" {
+		group = "Default"
+	}
+	action := &SayAction{
+		ID:       uid,
+		Phrase:   phrase,
+		FilePath: dst,
+		Group:    group,
+		Delay:    0,
+	}
+	if err = audioStore.Create(action); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create an audio: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "audio has been created successfully",
 		"id":       uid,
 		"filepath": dst,
 	})
@@ -435,6 +511,80 @@ func moveGroupsJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": moveStore.GetGroups(),
 	})
+}
+
+func audioJSONHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"data": audioStore.Items,
+	})
+}
+
+func getAudioJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	item, err := audioStore.Get(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": item,
+	})
+}
+
+func deleteAudioJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	err := audioStore.Delete(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "audio file has been deleted successfully",
+	})
+}
+
+func getInstructionJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	instruction := sessionsStore.GetInstruction(uid)
+	c.JSON(http.StatusOK, gin.H{"data": instruction})
+}
+
+func deleteInstructionJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	err := sessionsStore.DeleteInstruction(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "action has been deleted"})
+}
+
+func getSessionItemJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	item, err := sessionsStore.GetItem(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": item})
 }
 
 // Helpers

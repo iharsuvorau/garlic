@@ -56,7 +56,7 @@ func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
 		isFreshDatabase = true
 		file, err = os.Create(fpath)
 		if err != nil {
-			return nil, fmt.Errorf("can't create a session store at %s: %v", fpath, err)
+			return nil, fmt.Errorf("can't create a move store at %s: %v", fpath, err)
 		}
 	} else {
 		file, err = os.Open(fpath)

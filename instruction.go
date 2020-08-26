@@ -191,6 +191,7 @@ type SayAction struct {
 	ID       uuid.UUID
 	Phrase   string
 	FilePath string
+	Group    string
 	Delay    time.Duration
 }
 
