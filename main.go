@@ -151,6 +151,12 @@ func main() {
 		c.String(http.StatusOK, "")
 	})
 
+	r.GET("/api/data/export", exportDataJSONHandler)
+	//r.POST("/api/data/import", importDataJSONHandler)
+	r.OPTIONS("/api/data/export", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	//r.GET("/api/auth/", authJSONHandler)
 
@@ -585,6 +591,25 @@ func getSessionItemJSONHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": item})
+}
+
+func exportDataJSONHandler(c *gin.Context) {
+	// TODO: create tmp "data" directory with databases, uploaded files and built-in files
+	//fileStore.base
+	//
+	//sessionsStore.filepath
+	//moveStore.filepath
+	//audioStore.filepath
+
+	// TODO: archive and send in the request
+
+	// TODO: clean up
+}
+
+func importDataJSONHandler(c *gin.Context) {
+	// TODO: read the "data" directory
+	// TODO: extract databases, uploads and built-in files
+	// TODO: remove existing data directory and put new files inside, reload the server to read updated databases or just recreate store objects
 }
 
 // Helpers
