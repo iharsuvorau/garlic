@@ -48,15 +48,15 @@ func (s *ImageStore) GetByUUID(id uuid.UUID) (*ImageAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *ImageStore) GetByName(name string) (*ImageAction, error) {
-	for _, v := range s.Images {
-		if v.Name == name {
-			return v, nil
-		}
-	}
-
-	return nil, fmt.Errorf("not found")
-}
+//func (s *ImageStore) GetByName(name string) (*ImageAction, error) {
+//	for _, v := range s.Images {
+//		if v.Name == name {
+//			return v, nil
+//		}
+//	}
+//
+//	return nil, fmt.Errorf("not found")
+//}
 
 func (s *ImageStore) Get(id string) (*ImageAction, error) {
 	uid, err := uuid.Parse(id)
@@ -78,9 +78,9 @@ func (s *ImageStore) Create(v *ImageAction) error {
 		return fmt.Errorf("failed to create an image: ID must be provided")
 	}
 
-	if _, err := s.GetByName(v.Name); err == nil {
-		return fmt.Errorf("the image with such name already exists: %v", v.Name)
-	}
+	//if _, err := s.GetByName(v.Name); err == nil {
+	//	return fmt.Errorf("the image with such name already exists: %v", v.Name)
+	//}
 
 	s.mu.Lock()
 	s.Images = append(s.Images, v)

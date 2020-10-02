@@ -229,13 +229,13 @@ func (s *SessionStore) Delete(id string) error {
 		}
 		for _, action := range item.Actions {
 			if action.SayItem != nil && action.SayItem.FilePath != "" {
-				if err = os.Remove(action.SayItem.FilePath); err != nil {
-					if os.IsNotExist(err) {
-						log.Printf("tried to remove unexistent file: %v", action.SayItem.FilePath)
-						err = nil
-					} else {
-						return fmt.Errorf("failed to remove an audio file: %v", err)
-					}
+				if err = removeFile(action.SayItem.FilePath); err != nil {
+					return err
+				}
+			}
+			if action.ImageItem != nil && action.ImageItem.FilePath != "" {
+				if err = removeFile(action.ImageItem.FilePath); err != nil {
+					return err
 				}
 			}
 		}
@@ -270,6 +270,12 @@ func (s *SessionStore) DeleteInstruction(id string) error {
 			err = os.Remove(instruction.SayItem.FilePath)
 			if err != nil {
 				log.Println(fmt.Errorf("failed to remove audio from the action: %v", err))
+			}
+		}
+		if instruction.ImageItem != nil && instruction.ImageItem.FilePath != "" {
+			err = os.Remove(instruction.ImageItem.FilePath)
+			if err != nil {
+				log.Println(fmt.Errorf("failed to remove image %s from the action: %v", instruction.ImageItem.FilePath, err))
 			}
 		}
 	}
@@ -308,4 +314,17 @@ func (s *SessionStore) dump() error {
 	}
 	defer f.Close()
 	return json.NewEncoder(f).Encode(s.Sessions)
+}
+
+func removeFile(filePath string) error {
+	err := os.Remove(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("tried to remove unexistent file: %v", filePath)
+			err = nil
+		} else {
+			err = fmt.Errorf("failed to remove a file %s: %v", filePath, err)
+		}
+	}
+	return err
 }

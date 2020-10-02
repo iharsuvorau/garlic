@@ -26,6 +26,7 @@ import (
 // TODO: make abstraction separation clearer between Session and ImageStore, SayStore and FileStore
 // TODO: make so that SayItem is not compulsory, any Action could be there
 // NOTE: another approach to files: don't send them with each request, but serve as static files and send only URL
+// TODO: is session is removed from UI, remove attached images
 
 // App-wide variables
 var (
@@ -41,7 +42,7 @@ var (
 	sessionsStore *SessionStore
 	moveStore     *MoveStore
 	audioStore    *SayStore
-	imageStore    *ImageStore
+	//imageStore    *ImageStore
 
 	pepperStatus uint8 // 0 -- disconnected, 1 -- connected
 )
@@ -74,11 +75,11 @@ func main() {
 	}
 	log.Printf("%v moves in the database", len(moveStore.Moves))
 
-	imageStore, err = NewImageStore("data/images.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("%v moves in the database", len(moveStore.Moves))
+	//imageStore, err = NewImageStore("data/images.json")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//log.Printf("%v moves in the database", len(moveStore.Moves))
 
 	audioStore, err = NewSayStore("data/audio.json")
 	if err != nil {
@@ -236,9 +237,9 @@ func sendCommandHandler(c *gin.Context) {
 	if curInstruction.IsNil() {
 		curInstruction, _ = moveStore.GetByUUID(form.ItemID)
 	}
-	if curInstruction.IsNil() {
-		curInstruction, _ = imageStore.GetByUUID(form.ItemID)
-	}
+	//if curInstruction.IsNil() {
+	//	curInstruction, _ = imageStore.GetByUUID(form.ItemID)
+	//}
 	if curInstruction.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":  fmt.Sprintf("can't find the instruction with the ID %s", form.ItemID),
@@ -527,24 +528,24 @@ func imageUploadJSONHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	imageName := c.DefaultPostForm("name", "")
-	if imageName == "" {
-		imageName = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", -1)
-	}
-	group := c.DefaultPostForm("group", "")
-	if group == "" {
-		group = "Default"
-	}
-	image := &ImageAction{
-		ID:       uid,
-		Name:     imageName,
-		FilePath: dst,
-		Group:    group,
-	}
-	if err = imageStore.Create(image); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create an image: %v", err)})
-		return
-	}
+	//imageName := c.DefaultPostForm("name", "")
+	//if imageName == "" {
+	//	imageName = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", -1)
+	//}
+	//group := c.DefaultPostForm("group", "")
+	//if group == "" {
+	//	group = "Default"
+	//}
+	//image := &ImageAction{
+	//	ID:       uid,
+	//	Name:     imageName,
+	//	FilePath: dst,
+	//	Group:    group,
+	//}
+	//if err = imageStore.Create(image); err != nil {
+	//	c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create an image: %v", err)})
+	//	return
+	//}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "file has been uploaded successfully",
