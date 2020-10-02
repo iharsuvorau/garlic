@@ -13,11 +13,19 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // TODO: communicate over WSS
 // TODO: is there a need to keep WS connection live using ping-pong?
 // TODO: implement basic auth and logout
+
+// TODO: fileStore in handlers: upload image, updated ImageStore
+
+// TODO: on image upload, even if an image with the same name already exists, the image is uploaded anyway, but the session item isn't created
+// TODO: make abstraction separation clearer between Session and ImageStore, SayStore and FileStore
+// TODO: make so that SayItem is not compulsory, any Action could be there
+// NOTE: another approach to files: don't send them with each request, but serve as static files and send only URL
 
 // App-wide variables
 var (
@@ -27,12 +35,15 @@ var (
 	// wsConnection keeps the current WebSocket connection.
 	// Only one connection can be at the moment with the Pepper robot.
 	wsConnection *websocket.Conn
+	wsMu         sync.Mutex
 
 	fileStore     *FileStore
 	sessionsStore *SessionStore
 	moveStore     *MoveStore
 	audioStore    *SayStore
-	pepperStatus  uint8 // 0 -- disconnected, 1 -- connected
+	imageStore    *ImageStore
+
+	pepperStatus uint8 // 0 -- disconnected, 1 -- connected
 )
 
 // CLI arguments
@@ -58,6 +69,12 @@ func main() {
 	}
 
 	moveStore, err = NewMoveStore("data/moves.json", *motionsDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%v moves in the database", len(moveStore.Moves))
+
+	imageStore, err = NewImageStore("data/images.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -128,6 +145,11 @@ func main() {
 		c.String(http.StatusOK, "")
 	})
 
+	r.POST("/api/upload/image", imageUploadJSONHandler)
+	r.OPTIONS("/api/upload/image", func(c *gin.Context) {
+		c.String(http.StatusOK, "")
+	})
+
 	r.POST("/api/upload/move", moveUploadJSONHandler)
 	r.OPTIONS("/api/upload/move", func(c *gin.Context) {
 		c.String(http.StatusOK, "")
@@ -159,6 +181,8 @@ func main() {
 
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	//r.GET("/api/auth/", authJSONHandler)
+
+	r.GET("/api/server_ip", getServerIPJSONHandler)
 
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Pepper webserver")
@@ -203,14 +227,17 @@ func sendCommandHandler(c *gin.Context) {
 		return
 	}
 
-	// We can receive two types of instructions: SayCommand and MoveCommand. In the first case,
-	// we just respond with OK status and the web browser will play an audio file for the
-	// instruction. If something is wrong, we reply with error and the sound won't be played. In the second case,
-	// we push the motion command to a web socket for Pepper to execute.
+	// We can receive three types of instructions: SayCommand, MoveCommand, ShowImageCommand.
+	// In the first case, we just respond with OK status and the web browser will play an audio file for the instruction.
+	// If something is wrong, we reply with error and the sound won't be played.
+	// In the second and third cases, we push the command to a web socket for Pepper to execute.
 	var curInstruction Instruction
 	curInstruction = sessionsStore.GetInstruction(form.ItemID)
 	if curInstruction.IsNil() {
 		curInstruction, _ = moveStore.GetByUUID(form.ItemID)
+	}
+	if curInstruction.IsNil() {
+		curInstruction, _ = imageStore.GetByUUID(form.ItemID)
 	}
 	if curInstruction.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -238,6 +265,8 @@ func initiateHandler(c *gin.Context) {
 	// PepperIncomingMessage is used to parse requests from the Android application on the Pepper's side.
 	// It sends available built-in motions when starts itself, so the webserver can register these motions
 	// and give a user an option to use built-in motions.
+	log.Printf("establishing a websocket connection")
+
 	type PepperIncomingMessage struct {
 		Moves []string `json:"moves"`
 	}
@@ -250,6 +279,7 @@ func initiateHandler(c *gin.Context) {
 	defer wsConnection.Close()
 
 	pepperStatus = 1
+	log.Printf("websocket connection has been established with %s", c.Request.RemoteAddr)
 
 	wsConnection.SetCloseHandler(func(code int, text string) error {
 		log.Printf("websocket connection close handler: %v, %v", code, text)
@@ -477,6 +507,52 @@ func moveUploadJSONHandler(c *gin.Context) {
 	})
 }
 
+func imageUploadJSONHandler(c *gin.Context) {
+	// NOTE: using form data instead of JSON because of file upload in this handler
+
+	f, fh, err := c.Request.FormFile("file_content")
+	if err != nil {
+		log.Printf("imageUploadJSONHandler: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer f.Close()
+
+	uid := uuid.Must(uuid.NewRandom())
+	ext := filepath.Ext(fh.Filename)
+	name := uid.String() + ext
+	dst, err := fileStore.Save(name, f)
+	if err != nil {
+		log.Printf("imageUploadJSONHandler, can't save the file %v: %v", name, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	imageName := c.DefaultPostForm("name", "")
+	if imageName == "" {
+		imageName = strings.Replace(fh.Filename, filepath.Ext(fh.Filename), "", -1)
+	}
+	group := c.DefaultPostForm("group", "")
+	if group == "" {
+		group = "Default"
+	}
+	image := &ImageAction{
+		ID:       uid,
+		Name:     imageName,
+		FilePath: dst,
+		Group:    group,
+	}
+	if err = imageStore.Create(image); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create an image: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "file has been uploaded successfully",
+		"id":       uid,
+		"filepath": dst,
+	})
+}
+
 func movesJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": moveStore.Moves,
@@ -610,6 +686,15 @@ func importDataJSONHandler(c *gin.Context) {
 	// TODO: read the "data" directory
 	// TODO: extract databases, uploads and built-in files
 	// TODO: remove existing data directory and put new files inside, reload the server to read updated databases or just recreate store objects
+}
+
+func getServerIPJSONHandler(c *gin.Context) {
+	ip, err := externalIP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot get server IP address"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": ip})
 }
 
 // Helpers

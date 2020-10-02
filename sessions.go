@@ -54,6 +54,11 @@ func (s *Session) initializeIDs() {
 					action.MoveItem.ID = uuid.Must(uuid.NewRandom())
 				}
 			}
+			if action.ImageItem != nil {
+				if (action.ImageItem.ID == uuid.UUID{}) {
+					action.ImageItem.ID = uuid.Must(uuid.NewRandom())
+				}
+			}
 		}
 	}
 }
@@ -113,10 +118,14 @@ func (s *SessionStore) GetInstruction(id uuid.UUID) *SayAndMoveAction {
 					return action
 				}
 
-				if action.SayItem != nil {
-					if action.SayItem.ID == id || action.MoveItem.ID == id {
-						return action
-					}
+				if action.SayItem != nil && action.SayItem.ID == id {
+					return action
+				}
+				if action.MoveItem != nil && action.MoveItem.ID == id {
+					return action
+				}
+				if action.ImageItem != nil && action.ImageItem.ID == id {
+					return action
 				}
 			}
 		}

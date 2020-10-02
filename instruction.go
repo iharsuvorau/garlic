@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,7 +26,7 @@ type Instruction interface {
 
 type PepperMessage struct {
 	Command Command `json:"command"`
-	Content []byte  `json:"content"`
+	Content string  `json:"content"`
 	Name    string  `json:"name"`
 	Delay   int64   `json:"delay"`
 }
@@ -50,49 +52,59 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		if err != nil {
 			return fmt.Errorf("can't marshal PepperMessage: %v", err)
 		}
+		wsMu.Lock()
+		defer func() {
+			wsMu.Unlock()
+		}()
 		return connection.WriteMessage(websocket.TextMessage, b)
 	}
 
-	if instruction.Command() == SayAndMoveCommand { // unpacking the wrapper and sending two actions sequentially
-		// NOTE: actually, we send only a motion now, because audio is played via a speaker from a local computer
+	if instruction.Command() == SayAndMoveCommand { // unpacking the wrapper and sending three actions sequentially
+		// NOTE: actually, we send only a motion and image now, because audio is played via a speaker from a local computer
 		cmd := instruction.(*SayAndMoveAction)
-
 		// first, trying to get the content of a file
-		content, err := cmd.MoveItem.Content()
-		if err != nil && cmd.MoveItem.Name == "" {
-			// second, checking on the name presence and sending just a name,
-			// the move should be located on the Android app's side then
-			return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
-		} else {
-			err = nil
+
+		if cmd.MoveItem != nil {
+			content, err := cmd.MoveItem.Content()
+			if err != nil && cmd.MoveItem.Name == "" {
+				// second, checking on the name presence and sending just a name,
+				// the move should be located on the Android app's side then
+				return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
+			} else {
+				err = nil
+			}
+
+			move := PepperMessage{
+				Command: cmd.MoveItem.Command(),
+				Name:    cmd.MoveItem.Name,
+				Content: base64.StdEncoding.EncodeToString(content),
+				Delay:   cmd.MoveItem.DelayMillis(),
+			}
+
+			if err := send(move, connection); err != nil {
+				return err
+			}
 		}
 
-		move := PepperMessage{
-			Command: cmd.MoveItem.Command(),
-			Name:    cmd.MoveItem.Name,
-			Content: content,
-			Delay:   cmd.MoveItem.DelayMillis(),
-		}
+		// second, trying to get an image
+		if cmd.ImageItem != nil {
+			content, err := cmd.ImageItem.Content()
+			if err != nil {
+				log.Println("no image content")
+				err = nil
+			}
 
-		if err := send(move, connection); err != nil {
-			return err
-		}
+			image := PepperMessage{
+				Command: cmd.ImageItem.Command(),
+				Content: base64.StdEncoding.EncodeToString(content),
+				Name:    cmd.ImageItem.Name,
+				Delay:   cmd.ImageItem.DelayMillis(),
+			}
 
-		// if now file path, we don't have an audio locally, then send the phrase to the robot
-		//if cmd.SayItem.FilePath == "" {
-		//	say := PepperMessage{
-		//		Command: cmd.SayItem.Command(),
-		//		Content: []byte(cmd.SayItem.Phrase),
-		//		Name:    "",
-		//		Delay:   0,
-		//	}
-		//
-		//	if err := send(say, connection); err != nil {
-		//		return err
-		//	}
-		//
-		//	return fmt.Errorf("sayItem doesn't have FilePath, command has been sent to the robot")
-		//}
+			if err := send(image, connection); err != nil {
+				return err
+			}
+		}
 	} else { // just sending the instruction
 		name := instruction.GetName()
 		content, err := instruction.Content()
@@ -105,7 +117,7 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		move := PepperMessage{
 			Command: instruction.Command(),
 			Name:    name,
-			Content: content,
+			Content: base64.StdEncoding.EncodeToString(content),
 			Delay:   instruction.DelayMillis(),
 		}
 		return send(move, connection)
@@ -124,6 +136,8 @@ func (c Command) String() string {
 		return "move"
 	case SayAndMoveCommand:
 		return "sayAndMove"
+	case ShowImageCommand:
+		return "show_image"
 	}
 	return ""
 }
@@ -133,6 +147,7 @@ const (
 	SayCommand Command = iota
 	MoveCommand
 	SayAndMoveCommand
+	ShowImageCommand
 )
 
 // SayAndMoveAction implements Instruction
@@ -140,9 +155,10 @@ const (
 // SayAndMoveAction is a wrapper around other elemental actions. This type is never sent over
 // a web socket on itself. sendInstruction should take care about it.
 type SayAndMoveAction struct {
-	ID       uuid.UUID
-	SayItem  *SayAction
-	MoveItem *MoveAction
+	ID        uuid.UUID
+	SayItem   *SayAction
+	MoveItem  *MoveAction
+	ImageItem *ImageAction
 }
 
 func (item *SayAndMoveAction) IsValid() bool {
@@ -291,5 +307,69 @@ func (item *MoveAction) IsNil() bool {
 }
 
 func (item *MoveAction) GetName() string {
+	return item.Name
+}
+
+// ImageAction implements Instruction
+
+type ImageAction struct {
+	ID       uuid.UUID
+	Name     string
+	FilePath string
+	Delay    time.Duration
+	Group    string
+}
+
+func (item *ImageAction) Command() Command {
+	return ShowImageCommand
+}
+
+func (item *ImageAction) Content() (b []byte, err error) {
+	if item.IsNil() {
+		return b, fmt.Errorf("nil item")
+	}
+
+	if item.FilePath == "" {
+		return b, fmt.Errorf("FilePath is missing")
+	}
+
+	f, err := os.Open(item.FilePath)
+	defer f.Close()
+	if err != nil {
+		return b, err
+	}
+
+	return ioutil.ReadAll(f)
+}
+
+func (item *ImageAction) DelayMillis() int64 {
+	if item == nil {
+		return 0
+	}
+	return item.Delay.Milliseconds()
+}
+
+func (item *ImageAction) String() string {
+	if item == nil {
+		return ""
+	}
+	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
+}
+
+func (item *ImageAction) IsValid() bool {
+	if item == nil {
+		return false
+	}
+	if _, err := uuid.Parse(item.ID.String()); err != nil {
+		return false
+	}
+	return true
+}
+
+func (item *ImageAction) IsNil() bool {
+	return item == nil
+}
+
+func (item *ImageAction) GetName() string {
 	return item.Name
 }
