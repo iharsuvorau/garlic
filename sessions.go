@@ -96,6 +96,17 @@ func NewSessionStore(fpath string) (*SessionStore, error) {
 		return nil, fmt.Errorf("can't decode sessions from %s: %v", fpath, err)
 	}
 
+	// create empty show-image actions for existing items
+	for _, s := range sessions {
+		for _, item := range s.Items {
+			for _, action := range item.Actions {
+				if action.ImageItem == nil {
+					action.ImageItem = &ImageAction{}
+				}
+			}
+		}
+	}
+
 	store := &SessionStore{
 		filepath: fpath,
 		Sessions: sessions,

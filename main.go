@@ -44,7 +44,7 @@ var (
 
 // CLI arguments
 var (
-	servingAddr = flag.String("addr", ":8080", "http service address")
+	servingAddr = flag.String("addr", "0.0.0.0:8080", "http service address")
 	motionsDir  = flag.String("moves", "data/pepper-core-anims-master", "path to the folder with moves")
 )
 
@@ -685,7 +685,7 @@ func importDataJSONHandler(c *gin.Context) {
 }
 
 func getServerIPJSONHandler(c *gin.Context) {
-	ip, err := externalIP()
+	ip, err := getOutboundIP()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot get server IP address"})
 	}
@@ -744,4 +744,15 @@ func externalIP() (string, error) {
 		}
 	}
 	return "", errors.New("are you connected to the network?")
+}
+
+func getOutboundIP() (string, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String(), err
 }
