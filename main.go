@@ -227,29 +227,29 @@ func sendCommandHandler(c *gin.Context) {
 	// In the first case, we just respond with OK status and the web browser will play an audio file for the instruction.
 	// If something is wrong, we reply with error and the sound won't be played.
 	// In the second and third cases, we push the command to a web socket for Pepper to execute.
-	var curInstruction Instruction
-	curInstruction = sessionsStore.GetInstruction(form.ItemID)
-	if curInstruction.IsNil() {
-		curInstruction, _ = moveStore.GetByUUID(form.ItemID)
+	var action Instruction
+	action = sessionsStore.GetAction(form.ItemID)
+	if action.IsNil() {
+		action, _ = moveStore.GetByUUID(form.ItemID)
 	}
-	//if curInstruction.IsNil() {
-	//	curInstruction, _ = imageStore.GetByUUID(form.ItemID)
+	//if action.IsNil() {
+	//	action, _ = imageStore.GetByUUID(form.ItemID)
 	//}
-	if curInstruction.IsNil() {
+	if action.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":  fmt.Sprintf("can't find the instruction with the ID %s", form.ItemID),
 			"method": "sendCommandHandler",
 		})
 		return
 	}
-	if !curInstruction.IsValid() {
+	if !action.IsValid() {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":  "got an invalid instruction",
 			"method": "sendCommandHandler",
 		})
 		return
 	}
-	if err = sendInstruction(curInstruction, wsConnection); err != nil {
+	if err = sendInstruction(action, wsConnection); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -636,7 +636,7 @@ func getInstructionJSONHandler(c *gin.Context) {
 		})
 		return
 	}
-	instruction := sessionsStore.GetInstruction(uid)
+	instruction := sessionsStore.GetAction(uid)
 	c.JSON(http.StatusOK, gin.H{"data": instruction})
 }
 

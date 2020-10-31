@@ -67,7 +67,7 @@ func (s *Session) initializeIDs() {
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
 	ID      uuid.UUID
-	Actions []*SayAndMoveAction // the first item of Actions is the main item, usually, it's the main question
+	Actions []*Action // the first item of Actions is the main item, usually, it's the main question
 	// of the session item, other actions are some kind of conversation supportive answers
 }
 
@@ -115,9 +115,9 @@ func NewSessionStore(fpath string) (*SessionStore, error) {
 	return store, nil
 }
 
-// GetInstruction looks for a top level instruction, which unites Say and Move actions
+// GetAction looks for a top level instruction, which unites Say and Move actions
 // and presents them as a union of two actions, so both actions should be executed.
-func (s *SessionStore) GetInstruction(id uuid.UUID) *SayAndMoveAction {
+func (s *SessionStore) GetAction(id uuid.UUID) *Action {
 	for _, session := range s.Sessions {
 		for _, item := range session.Items {
 			for _, action := range item.Actions {
@@ -275,7 +275,7 @@ func (s *SessionStore) DeleteInstruction(id string) error {
 	}
 
 	// removing instruction's files
-	instruction := s.GetInstruction(uid)
+	instruction := s.GetAction(uid)
 	if instruction != nil {
 		if instruction.SayItem != nil && len(instruction.SayItem.FilePath) > 0 {
 			err = os.Remove(instruction.SayItem.FilePath)
@@ -296,7 +296,7 @@ func (s *SessionStore) DeleteInstruction(id string) error {
 		for _, item := range session.Items {
 			for _, instruction := range item.Actions {
 				if instruction.ID == uid {
-					newActions := []*SayAndMoveAction{}
+					newActions := []*Action{}
 					for _, action := range item.Actions {
 						if action.ID == uid {
 							continue

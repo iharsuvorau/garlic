@@ -38,7 +38,7 @@ func TestPepperMessage_MarshalJSON(t *testing.T) {
 		{
 			name: "B",
 			fields: fields{
-				Command: SayAndMoveCommand,
+				Command: ActionCommand,
 				Content: []byte{},
 			},
 			want:    mustBytes(json.Marshal(map[string]interface{}{"command": "sayAndMove", "content": []byte{}, "delay": 0})),

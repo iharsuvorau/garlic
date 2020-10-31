@@ -4,13 +4,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 // Instruction interface
@@ -59,30 +60,33 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		return connection.WriteMessage(websocket.TextMessage, b)
 	}
 
-	if instruction.Command() == SayAndMoveCommand { // unpacking the wrapper and sending three actions sequentially
+	if instruction.Command() == ActionCommand { // unpacking the wrapper and sending three actions sequentially
 		// NOTE: actually, we send only a motion and image now, because audio is played via a speaker from a local computer
-		cmd := instruction.(*SayAndMoveAction)
-		// first, trying to get the content of a file
+		cmd := instruction.(*Action)
 
+		// first, trying to get the content of a file
 		if cmd.MoveItem != nil {
 			content, err := cmd.MoveItem.Content()
 			if err != nil && cmd.MoveItem.Name == "" {
 				// second, checking on the name presence and sending just a name,
 				// the move should be located on the Android app's side then
-				return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
+				log.Printf("no motion content: %v", err)
+				err = nil // TODO: empty MoveItem shouldn't be created in the first place, need to change the frontend behaviour
 			} else {
 				err = nil
 			}
 
-			move := PepperMessage{
-				Command: cmd.MoveItem.Command(),
-				Name:    cmd.MoveItem.Name,
-				Content: base64.StdEncoding.EncodeToString(content),
-				Delay:   cmd.MoveItem.DelayMillis(),
-			}
+			if len(content) > 0 || cmd.MoveItem.Name != "" {
+				move := PepperMessage{
+					Command: cmd.MoveItem.Command(),
+					Name:    cmd.MoveItem.Name,
+					Content: base64.StdEncoding.EncodeToString(content),
+					Delay:   cmd.MoveItem.DelayMillis(),
+				}
 
-			if err := send(move, connection); err != nil {
-				return err
+				if err := send(move, connection); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -92,20 +96,21 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 			if err != nil {
 				log.Println("no image content")
 				err = nil
-			}
+			} else {
+				image := PepperMessage{
+					Command: cmd.ImageItem.Command(),
+					Content: base64.StdEncoding.EncodeToString(content),
+					Name:    cmd.ImageItem.Name,
+					Delay:   cmd.ImageItem.DelayMillis(),
+				}
 
-			image := PepperMessage{
-				Command: cmd.ImageItem.Command(),
-				Content: base64.StdEncoding.EncodeToString(content),
-				Name:    cmd.ImageItem.Name,
-				Delay:   cmd.ImageItem.DelayMillis(),
-			}
-
-			if err := send(image, connection); err != nil {
-				return err
+				if err := send(image, connection); err != nil {
+					return err
+				}
 			}
 		}
 	} else { // just sending the instruction
+		// TODO: this is never called probably
 		name := instruction.GetName()
 		content, err := instruction.Content()
 		if err != nil && name == "" {
@@ -134,7 +139,7 @@ func (c Command) String() string {
 		return "say"
 	case MoveCommand:
 		return "move"
-	case SayAndMoveCommand:
+	case ActionCommand:
 		return "sayAndMove"
 	case ShowImageCommand:
 		return "show_image"
@@ -144,24 +149,24 @@ func (c Command) String() string {
 
 // possible Pepper commands
 const (
-	SayCommand Command = iota
+	ActionCommand Command = iota
+	SayCommand
 	MoveCommand
-	SayAndMoveCommand
 	ShowImageCommand
 )
 
-// SayAndMoveAction implements Instruction
+// Action implements Instruction
 
-// SayAndMoveAction is a wrapper around other elemental actions. This type is never sent over
+// Action is a wrapper around other elemental actions. This type is never sent over
 // a web socket on itself. sendInstruction should take care about it.
-type SayAndMoveAction struct {
+type Action struct {
 	ID        uuid.UUID
 	SayItem   *SayAction
 	MoveItem  *MoveAction
 	ImageItem *ImageAction
 }
 
-func (item *SayAndMoveAction) IsValid() bool {
+func (item *Action) IsValid() bool {
 	if item == nil {
 		return false
 	}
@@ -174,30 +179,30 @@ func (item *SayAndMoveAction) IsValid() bool {
 	return true
 }
 
-func (item *SayAndMoveAction) Command() Command {
-	return SayAndMoveCommand
+func (item *Action) Command() Command {
+	return ActionCommand
 }
 
-func (item *SayAndMoveAction) Content() (b []byte, err error) {
+func (item *Action) Content() (b []byte, err error) {
 	return
 }
 
-func (item *SayAndMoveAction) DelayMillis() int64 {
+func (item *Action) DelayMillis() int64 {
 	return 0
 }
 
-func (item *SayAndMoveAction) String() string {
+func (item *Action) String() string {
 	if item == nil {
 		return ""
 	}
 	return fmt.Sprintf("say %q and move %q", item.SayItem.Phrase, item.MoveItem.Name)
 }
 
-func (item *SayAndMoveAction) IsNil() bool {
+func (item *Action) IsNil() bool {
 	return item == nil
 }
 
-func (item *SayAndMoveAction) GetName() string {
+func (item *Action) GetName() string {
 	return item.MoveItem.Name
 }
 
