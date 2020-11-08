@@ -39,3 +39,7 @@ func (s *FileStore) Get(name string) (*os.File, error) {
 	}
 	return f, nil
 }
+
+func (s *FileStore) Delete(filename string) error {
+	return removeFile(filename)
+}
