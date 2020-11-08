@@ -4,9 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"log"
 	"net"
@@ -14,6 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 // TODO: communicate over WSS
@@ -37,6 +38,7 @@ var (
 	sessionsStore *SessionStore
 	moveStore     *MoveStore
 	audioStore    *SayStore
+	actionsStore  *ActionsStore
 	//imageStore    *ImageStore
 
 	pepperStatus uint8 // 0 -- disconnected, 1 -- connected
@@ -81,6 +83,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	actionsStore, err = NewActionsStore("data/actions.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if ip, err := externalIP(); err == nil {
 		log.Printf("IP of the machine: %v", ip)
 	} else {
@@ -106,83 +113,61 @@ func main() {
 
 	// JSON: UI API
 
+	// pepper API
 	r.GET("/api/pepper/status", pepperStatusJSONHandler)
 	r.POST("/api/pepper/send_command", sendCommandHandler)
-	r.OPTIONS("/api/pepper/send_command", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/pepper/send_command", emptyResponseOK)
 
+	// sessions API
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
-	r.OPTIONS("/api/sessions/", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
-
+	r.OPTIONS("/api/sessions/", emptyResponseOK)
 	r.GET("/api/sessions/:id", getSessionJSONHandler)
 	r.PUT("/api/sessions/:id", updateSessionJSONHandler)
 	r.DELETE("/api/sessions/:id", deleteSessionJSONHandler)
-	r.OPTIONS("/api/sessions/:id", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
-
+	r.OPTIONS("/api/sessions/:id", emptyResponseOK)
 	r.GET("/api/session_items/:id", getSessionItemJSONHandler)
-	r.OPTIONS("/api/session_items/:id", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/session_items/:id", emptyResponseOK)
 
 	r.GET("/api/instructions/:id", getInstructionJSONHandler)
 	r.DELETE("/api/instructions/:id", deleteInstructionJSONHandler)
-	r.OPTIONS("/api/instructions/:id", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/instructions/:id", emptyResponseOK)
 
+	// general upload API
 	r.POST("/api/upload/audio", audioUploadJSONHandler)
-	r.OPTIONS("/api/upload/audio", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
-
+	r.OPTIONS("/api/upload/audio", emptyResponseOK)
+	r.DELETE("/api/upload/audio", deleteUploadJSONHandler)
 	r.POST("/api/upload/image", imageUploadJSONHandler)
-	r.OPTIONS("/api/upload/image", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
-
+	r.OPTIONS("/api/upload/image", emptyResponseOK)
+	r.DELETE("/api/upload/image", deleteUploadJSONHandler)
 	r.POST("/api/upload/move", moveUploadJSONHandler)
-	r.OPTIONS("/api/upload/move", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/upload/move", emptyResponseOK)
 
 	r.GET("/api/moves/", movesJSONHandler)
 	r.GET("/api/moves/:id", getMoveJSONHandler)
 	r.DELETE("/api/moves/:id", deleteMoveJSONHandler)
-	r.OPTIONS("/api/moves/:id", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/moves/:id", emptyResponseOK)
 
 	r.GET("/api/audio/", audioJSONHandler)
 	r.POST("/api/audio/", createAudioJSONHandler)
-	r.OPTIONS("/api/audio/", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/audio/", emptyResponseOK)
 	r.GET("/api/audio/:id", getAudioJSONHandler)
 	r.DELETE("/api/audio/:id", deleteAudioJSONHandler)
-	r.OPTIONS("/api/audio/:id", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
+	r.OPTIONS("/api/audio/:id", emptyResponseOK)
 
+	r.GET("/api/actions/", actionsJSONHandler)
+	r.POST("/api/actions/", createActionJSONHandler)
+	r.OPTIONS("/api/actions/", emptyResponseOK)
+
+	// utilities
 	r.GET("/api/data/export", exportDataJSONHandler)
 	//r.POST("/api/data/import", importDataJSONHandler)
-	r.OPTIONS("/api/data/export", func(c *gin.Context) {
-		c.String(http.StatusOK, "")
-	})
-
+	r.OPTIONS("/api/data/export", emptyResponseOK)
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	//r.GET("/api/auth/", authJSONHandler)
-
 	r.GET("/api/server_ip", getServerIPJSONHandler)
 
-	r.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Pepper webserver")
-	})
+	r.GET("/", emptyResponseOK)
 
 	log.Fatal(r.Run(*servingAddr))
 }
@@ -196,6 +181,28 @@ func allowCORS(c *gin.Context) {
 }
 
 // Handlers
+
+func emptyResponseOK(c *gin.Context) {
+	c.String(http.StatusOK, "")
+}
+
+func deleteUploadJSONHandler(c *gin.Context) {
+	form := struct {
+		Filepath string `json:"filepath"`
+	}{}
+	err := c.ShouldBindJSON(&form)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = fileStore.Delete(form.Filepath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "file has been deleted"})
+}
 
 func pepperStatusJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": pepperStatus})
@@ -384,6 +391,8 @@ func createSessionJSONHandler(c *gin.Context) {
 }
 
 func audioUploadJSONHandler(c *gin.Context) {
+	// NOTE: using form data instead of JSON because of file upload in this handler
+
 	f, fh, err := c.Request.FormFile("file_content")
 	if err != nil {
 		log.Printf("audioUploadJSONHandler: %v", err)
@@ -650,6 +659,37 @@ func deleteInstructionJSONHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "action has been deleted"})
+}
+
+func actionsJSONHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"data": actionsStore.Items,
+	})
+}
+
+func createActionJSONHandler(c *gin.Context) {
+	newAction := new(Action)
+
+	err := c.ShouldBindJSON(&newAction)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err = actionsStore.Create(newAction)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Errorf("failed to create an action: %v", err),
+		})
+		log.Print(fmt.Errorf("failed to create an action: %v", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "action has been created successfully",
+	})
 }
 
 func getSessionItemJSONHandler(c *gin.Context) {
