@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 // Session represents a session with a child, a set of questions and simple answers which
@@ -208,7 +209,9 @@ func (s *SessionStore) GetItem(id string) (*SessionItem, error) {
 
 func (s *SessionStore) Create(newSession *Session) error {
 	newSession.initializeIDs()
+	s.mu.Lock()
 	s.Sessions = append(s.Sessions, newSession)
+	s.mu.Unlock()
 	return s.dump()
 }
 
