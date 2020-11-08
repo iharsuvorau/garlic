@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -160,10 +161,110 @@ const (
 // Action is a wrapper around other elemental actions. This type is never sent over
 // a web socket on itself. sendInstruction should take care about it.
 type Action struct {
-	ID        uuid.UUID
-	SayItem   *SayAction
-	MoveItem  *MoveAction
-	ImageItem *ImageAction
+	ID        uuid.UUID    `json:"ID" form:"ID"`
+	SayItem   *SayAction   `json:"SayItem" form:"SayItem"`
+	MoveItem  *MoveAction  `json:"MoveItem" form:"MoveItem"`
+	ImageItem *ImageAction `json:"ImageItem" form:"ImageItem"`
+}
+
+func (a *Action) UnmarshalJSON(b []byte) error {
+	m := map[string]interface{}{}
+	err := json.NewDecoder(bytes.NewReader(b)).Decode(&m)
+	if err != nil {
+		return err
+	}
+
+	sayItem, _ := m["SayItem"].(map[string]interface{})
+	moveItem, _ := m["MoveItem"].(map[string]interface{})
+	imageItem, _ := m["ImageItem"].(map[string]interface{})
+
+	var id, name, phrase, fpath, group string
+	var delay time.Duration
+	var uid uuid.UUID
+	var ok bool
+
+	if id, ok = sayItem["ID"].(string); ok && len(id) > 0 {
+		uid, err = uuid.Parse(id)
+		if err != nil {
+			return err
+		}
+	}
+	phrase, _ = sayItem["Phrase"].(string)
+	fpath, _ = sayItem["FilePath"].(string)
+	group, _ = sayItem["Group"].(string)
+	delay, _ = sayItem["Delay"].(time.Duration)
+	a.SayItem = &SayAction{
+		ID:       uid,
+		Phrase:   phrase,
+		FilePath: fpath,
+		Group:    group,
+		Delay:    delay,
+	}
+
+	if id, ok = moveItem["ID"].(string); ok && len(id) > 0 {
+		uid, err = uuid.Parse(id)
+		if err != nil {
+			return err
+		}
+	}
+	name, _ = moveItem["Name"].(string)
+	fpath, _ = moveItem["FilePath"].(string)
+	group, _ = moveItem["Group"].(string)
+	delay, _ = moveItem["Delay"].(time.Duration)
+	a.MoveItem = &MoveAction{
+		ID:       uid,
+		Name:     name,
+		FilePath: fpath,
+		Delay:    delay,
+		Group:    group,
+	}
+
+	if id, ok = imageItem["ID"].(string); ok && len(id) > 0 {
+		uid, err = uuid.Parse(id)
+		if err != nil {
+			return err
+		}
+	}
+	name, _ = imageItem["Name"].(string)
+	fpath, _ = imageItem["FilePath"].(string)
+	group, _ = imageItem["Group"].(string)
+	delay, _ = imageItem["Delay"].(time.Duration)
+	a.ImageItem = &ImageAction{
+		ID:       uid,
+		Name:     name,
+		FilePath: fpath,
+		Delay:    delay,
+		Group:    group,
+	}
+
+	return nil
+}
+
+func NewAction() *Action {
+	return &Action{
+		ID: uuid.UUID{},
+		SayItem: &SayAction{
+			ID:       uuid.UUID{},
+			Phrase:   "",
+			FilePath: "",
+			Group:    "",
+			Delay:    0,
+		},
+		MoveItem: &MoveAction{
+			ID:       uuid.UUID{},
+			Name:     "",
+			FilePath: "",
+			Delay:    0,
+			Group:    "",
+		},
+		ImageItem: &ImageAction{
+			ID:       uuid.UUID{},
+			Name:     "",
+			FilePath: "",
+			Delay:    0,
+			Group:    "",
+		},
+	}
 }
 
 func (item *Action) IsValid() bool {
@@ -173,9 +274,9 @@ func (item *Action) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
-	if item.SayItem.Phrase == "" {
-		return false
-	}
+	//if item.SayItem.Phrase == "" {
+	//	return false
+	//}
 	return true
 }
 
@@ -191,12 +292,12 @@ func (item *Action) DelayMillis() int64 {
 	return 0
 }
 
-func (item *Action) String() string {
-	if item == nil {
-		return ""
-	}
-	return fmt.Sprintf("say %q and move %q", item.SayItem.Phrase, item.MoveItem.Name)
-}
+//func (item *Action) String() string {
+//	if item == nil {
+//		return ""
+//	}
+//	return fmt.Sprintf("say %q and move %q", item.SayItem.Phrase, item.MoveItem.Name)
+//}
 
 func (item *Action) IsNil() bool {
 	return item == nil
@@ -232,9 +333,9 @@ func (item *SayAction) DelayMillis() int64 {
 	return item.Delay.Milliseconds()
 }
 
-func (item *SayAction) String() string {
-	return fmt.Sprintf("say %s from %s", item.Phrase, item.FilePath)
-}
+//func (item *SayAction) String() string {
+//	return fmt.Sprintf("say %s from %s", item.Phrase, item.FilePath)
+//}
 
 func (item *SayAction) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
@@ -290,12 +391,12 @@ func (item *MoveAction) DelayMillis() int64 {
 	return item.Delay.Milliseconds()
 }
 
-func (item *MoveAction) String() string {
-	if item == nil {
-		return ""
-	}
-	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
-}
+//func (item *MoveAction) String() string {
+//	if item == nil {
+//		return ""
+//	}
+//	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
+//}
 
 func (item *MoveAction) IsValid() bool {
 	if item == nil {
@@ -354,12 +455,12 @@ func (item *ImageAction) DelayMillis() int64 {
 	return item.Delay.Milliseconds()
 }
 
-func (item *ImageAction) String() string {
-	if item == nil {
-		return ""
-	}
-	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
-}
+//func (item *ImageAction) String() string {
+//	if item == nil {
+//		return ""
+//	}
+//	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
+//}
 
 func (item *ImageAction) IsValid() bool {
 	if item == nil {
