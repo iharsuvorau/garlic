@@ -158,6 +158,8 @@ func main() {
 	r.GET("/api/actions/", actionsJSONHandler)
 	r.POST("/api/actions/", createActionJSONHandler)
 	r.OPTIONS("/api/actions/", emptyResponseOK)
+	r.DELETE("/api/actions/:id", deleteActionJSONHandler)
+	r.OPTIONS("/api/actions/:id", emptyResponseOK)
 
 	// utilities
 	r.GET("/api/data/export", exportDataJSONHandler)
@@ -689,6 +691,21 @@ func createActionJSONHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "action has been created successfully",
+	})
+}
+
+func deleteActionJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	err := actionsStore.Delete(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "action has been deleted successfully",
 	})
 }
 

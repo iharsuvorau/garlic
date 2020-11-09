@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 
 	"github.com/google/uuid"
@@ -68,6 +69,9 @@ func (s *ActionsStore) Create(a *Action) error {
 	if (a.ID == uuid.UUID{}) {
 		a.ID = uuid.Must(uuid.NewRandom())
 	}
+	if !a.IsValid() {
+		return fmt.Errorf("action is not valid")
+	}
 	s.mu.Lock()
 	s.Items = append(s.Items, a)
 	s.mu.Unlock()
@@ -92,7 +96,7 @@ func (s *ActionsStore) Delete(id string) error {
 		return err
 	}
 
-	_, err = s.Get(id)
+	action, err := s.Get(id)
 	if err != nil {
 		return err
 	}
@@ -107,10 +111,20 @@ func (s *ActionsStore) Delete(id string) error {
 	}
 
 	s.mu.Lock()
-	// TODO: remove resources
-	//if err = os.Remove(item.FilePath); err != nil {
-	//	return fmt.Errorf("failed to remove a file: %v", err)
-	//}
+
+	// removing resources
+	if action.SayItem != nil && len(action.SayItem.FilePath) > 0 {
+		if err = removeFile(action.SayItem.FilePath); err != nil {
+			return err
+		}
+	}
+	if action.ImageItem != nil && len(action.ImageItem.FilePath) > 0 {
+		if err = removeFile(action.ImageItem.FilePath); err != nil {
+			return err
+		}
+	}
+	// TODO: we're not removing motions, some of them might be in the built-in data folder
+
 	s.Items = newItems
 	s.mu.Unlock()
 
