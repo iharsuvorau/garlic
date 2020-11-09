@@ -241,9 +241,9 @@ func sendCommandHandler(c *gin.Context) {
 	if action.IsNil() {
 		action, _ = moveStore.GetByUUID(form.ItemID)
 	}
-	//if action.IsNil() {
-	//	action, _ = imageStore.GetByUUID(form.ItemID)
-	//}
+	if action.IsNil() {
+		action, _ = actionsStore.GetByUUID(form.ItemID)
+	}
 	if action.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":  fmt.Sprintf("can't find the instruction with the ID %s", form.ItemID),
