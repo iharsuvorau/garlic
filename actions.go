@@ -117,28 +117,27 @@ func (s *ActionsStore) Delete(id string) error {
 	return s.dump()
 }
 
-//
-//func (s *ActionsStore) GetGroups() []string {
-//	var groupsMap = map[string]interface{}{}
-//
-//	for _, v := range s.Items {
-//		if v == nil {
-//			continue
-//		}
-//
-//		groupsMap[v.Group] = nil
-//	}
-//
-//	var groups = make([]string, len(groupsMap))
-//	var i int64 = 0
-//	for k := range groupsMap {
-//		groups[i] = k
-//		i++
-//	}
-//	sort.Strings(groups)
-//
-//	return groups
-//}
+func (s *ActionsStore) GetGroups() []string {
+	var groupsMap = map[string]interface{}{}
+
+	for _, v := range s.Items {
+		if v == nil {
+			continue
+		}
+
+		groupsMap[v.Group] = nil
+	}
+
+	var groups = make([]string, len(groupsMap))
+	var i int64 = 0
+	for k := range groupsMap {
+		groups[i] = k
+		i++
+	}
+	sort.Strings(groups)
+
+	return groups
+}
 
 func (s *ActionsStore) dump() error {
 	s.mu.Lock()

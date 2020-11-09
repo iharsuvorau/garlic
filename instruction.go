@@ -162,6 +162,8 @@ const (
 // a web socket on itself. sendInstruction should take care about it.
 type Action struct {
 	ID        uuid.UUID    `json:"ID" form:"ID"`
+	Name      string       `json:"Name" form:"Name" binding:"required"`
+	Group     string       `json:"Group" form:"Group"`
 	SayItem   *SayAction   `json:"SayItem" form:"SayItem"`
 	MoveItem  *MoveAction  `json:"MoveItem" form:"MoveItem"`
 	ImageItem *ImageAction `json:"ImageItem" form:"ImageItem"`
@@ -174,14 +176,31 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	sayItem, _ := m["SayItem"].(map[string]interface{})
-	moveItem, _ := m["MoveItem"].(map[string]interface{})
-	imageItem, _ := m["ImageItem"].(map[string]interface{})
-
 	var id, name, phrase, fpath, group string
 	var delay time.Duration
 	var uid uuid.UUID
 	var ok bool
+
+	// decoding general fields
+
+	if id, ok = m["ID"].(string); ok && len(id) > 0 {
+		uid, err = uuid.Parse(id)
+		if err != nil {
+			return err
+		}
+	}
+	name, _ = m["Name"].(string)
+	group, _ = m["Group"].(string)
+
+	a.ID = uid
+	a.Name = name
+	a.Group = group
+
+	// decoding internal structs
+
+	sayItem, _ := m["SayItem"].(map[string]interface{})
+	moveItem, _ := m["MoveItem"].(map[string]interface{})
+	imageItem, _ := m["ImageItem"].(map[string]interface{})
 
 	if id, ok = sayItem["ID"].(string); ok && len(id) > 0 {
 		uid, err = uuid.Parse(id)
@@ -242,7 +261,9 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 
 func NewAction() *Action {
 	return &Action{
-		ID: uuid.UUID{},
+		ID:    uuid.UUID{},
+		Name:  "",
+		Group: "default",
 		SayItem: &SayAction{
 			ID:       uuid.UUID{},
 			Phrase:   "",
@@ -274,9 +295,6 @@ func (item *Action) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
-	//if item.SayItem.Phrase == "" {
-	//	return false
-	//}
 	return true
 }
 
@@ -291,13 +309,6 @@ func (item *Action) Content() (b []byte, err error) {
 func (item *Action) DelayMillis() int64 {
 	return 0
 }
-
-//func (item *Action) String() string {
-//	if item == nil {
-//		return ""
-//	}
-//	return fmt.Sprintf("say %q and move %q", item.SayItem.Phrase, item.MoveItem.Name)
-//}
 
 func (item *Action) IsNil() bool {
 	return item == nil
