@@ -263,7 +263,7 @@ func NewAction() *Action {
 	return &Action{
 		ID:    uuid.UUID{},
 		Name:  "",
-		Group: "default",
+		Group: "Default",
 		SayItem: &SayAction{
 			ID:       uuid.UUID{},
 			Phrase:   "",
