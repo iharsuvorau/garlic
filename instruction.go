@@ -190,7 +190,10 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 		}
 	}
 	name, _ = m["Name"].(string)
-	group, _ = m["Group"].(string)
+	group, ok = m["Group"].(string)
+	if !ok || group == "" {
+		group = "Default"
+	}
 
 	a.ID = uid
 	a.Name = name
