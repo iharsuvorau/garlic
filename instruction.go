@@ -176,8 +176,8 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	var id, name, phrase, fpath, group string
-	var delay time.Duration
+	var id, name, phrase, fpath, group, delay string
+	var delayns time.Duration // in nanoseconds
 	var uid uuid.UUID
 	var ok bool
 
@@ -211,13 +211,18 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	phrase, _ = sayItem["Phrase"].(string)
 	fpath, _ = sayItem["FilePath"].(string)
 	group, _ = sayItem["Group"].(string)
-	delay, _ = sayItem["Delay"].(time.Duration)
+	if delay, ok = sayItem["Delay"].(string); ok {
+		delayns, err = time.ParseDuration(delay + "s")
+		if err != nil {
+			return err
+		}
+	}
 	a.SayItem = &SayAction{
 		ID:       uid,
 		Phrase:   phrase,
 		FilePath: fpath,
 		Group:    group,
-		Delay:    delay,
+		Delay:    delayns,
 	}
 
 	if id, ok = moveItem["ID"].(string); ok && len(id) > 0 {
@@ -229,12 +234,19 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	name, _ = moveItem["Name"].(string)
 	fpath, _ = moveItem["FilePath"].(string)
 	group, _ = moveItem["Group"].(string)
-	delay, _ = moveItem["Delay"].(time.Duration)
+	if delay, ok = moveItem["Delay"].(string); ok {
+		delayns, err = time.ParseDuration(delay + "s")
+		if err != nil {
+			return err
+		}
+	} else {
+		delayns = 0
+	}
 	a.MoveItem = &MoveAction{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
-		Delay:    delay,
+		Delay:    delayns,
 		Group:    group,
 	}
 
@@ -247,12 +259,19 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	name, _ = imageItem["Name"].(string)
 	fpath, _ = imageItem["FilePath"].(string)
 	group, _ = imageItem["Group"].(string)
-	delay, _ = imageItem["Delay"].(time.Duration)
+	if delay, ok = imageItem["Delay"].(string); ok {
+		delayns, err = time.ParseDuration(delay + "s")
+		if err != nil {
+			return err
+		}
+	} else {
+		delayns = 0
+	}
 	a.ImageItem = &ImageAction{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
-		Delay:    delay,
+		Delay:    delayns,
 		Group:    group,
 	}
 
