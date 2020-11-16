@@ -317,6 +317,9 @@ func (item *Action) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
+	if !item.SayItem.IsValid() && !item.MoveItem.IsValid() && !item.ImageItem.IsValid() {
+		return false
+	}
 	return true
 }
 
@@ -371,10 +374,13 @@ func (item *SayAction) DelayMillis() int64 {
 //}
 
 func (item *SayAction) IsValid() bool {
+	if item == nil {
+		return false
+	}
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
-	if item.FilePath == "" {
+	if item.FilePath == "" && item.Phrase == "" {
 		return false
 	}
 	return true
@@ -436,6 +442,9 @@ func (item *MoveAction) IsValid() bool {
 		return false
 	}
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
+		return false
+	}
+	if len(item.Name) == 0 || len(item.FilePath) == 0 {
 		return false
 	}
 	return true
@@ -500,6 +509,9 @@ func (item *ImageAction) IsValid() bool {
 		return false
 	}
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
+		return false
+	}
+	if len(item.FilePath) == 0 {
 		return false
 	}
 	return true
