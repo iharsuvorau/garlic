@@ -162,8 +162,8 @@ const (
 // a web socket on itself. sendInstruction should take care about it.
 type Action struct {
 	ID        uuid.UUID    `json:"ID" form:"ID"`
-	Name      string       `json:"Name" form:"Name" binding:"required"`
-	Group     string       `json:"Group" form:"Group"`
+	Name      string       `json:"Name" form:"Name" binding:"required"` // NOTE: not used in sessions
+	Group     string       `json:"Group" form:"Group"`                  // NOTE: not used in sessions
 	SayItem   *SayAction   `json:"SayItem" form:"SayItem"`
 	MoveItem  *MoveAction  `json:"MoveItem" form:"MoveItem"`
 	ImageItem *ImageAction `json:"ImageItem" form:"ImageItem"`
