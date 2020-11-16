@@ -176,8 +176,8 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	var id, name, phrase, fpath, group, delay string
-	var delayns time.Duration // in nanoseconds
+	var id, name, phrase, fpath, group string
+	var delay time.Duration // in nanoseconds
 	var uid uuid.UUID
 	var ok bool
 
@@ -214,18 +214,15 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	phrase, _ = sayItem["Phrase"].(string)
 	fpath, _ = sayItem["FilePath"].(string)
 	group, _ = sayItem["Group"].(string)
-	if delay, ok = sayItem["Delay"].(string); ok {
-		delayns, err = time.ParseDuration(delay + "s")
-		if err != nil {
-			return err
-		}
+	if delay, err = castDelay(sayItem["Delay"]); err != nil {
+		return err
 	}
 	a.SayItem = &SayAction{
 		ID:       uid,
 		Phrase:   phrase,
 		FilePath: fpath,
 		Group:    group,
-		Delay:    delayns,
+		Delay:    delay,
 	}
 
 	if id, ok = moveItem["ID"].(string); ok && len(id) > 0 {
@@ -237,19 +234,14 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	name, _ = moveItem["Name"].(string)
 	fpath, _ = moveItem["FilePath"].(string)
 	group, _ = moveItem["Group"].(string)
-	if delay, ok = moveItem["Delay"].(string); ok {
-		delayns, err = time.ParseDuration(delay + "s")
-		if err != nil {
-			return err
-		}
-	} else {
-		delayns = 0
+	if delay, err = castDelay(moveItem["Delay"]); err != nil {
+		return err
 	}
 	a.MoveItem = &MoveAction{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
-		Delay:    delayns,
+		Delay:    delay,
 		Group:    group,
 	}
 
@@ -262,23 +254,35 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	name, _ = imageItem["Name"].(string)
 	fpath, _ = imageItem["FilePath"].(string)
 	group, _ = imageItem["Group"].(string)
-	if delay, ok = imageItem["Delay"].(string); ok {
-		delayns, err = time.ParseDuration(delay + "s")
-		if err != nil {
-			return err
-		}
-	} else {
-		delayns = 0
+	if delay, err = castDelay(imageItem["Delay"]); err != nil {
+		return err
 	}
 	a.ImageItem = &ImageAction{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
-		Delay:    delayns,
+		Delay:    delay,
 		Group:    group,
 	}
 
 	return nil
+}
+
+func castDelay(delay interface{}) (delayNanoseconds time.Duration, err error) {
+	switch v := delay.(type) { // for some reason, incoming value can by any of these types
+	case string:
+		delayNanoseconds, err = time.ParseDuration(v + "s")
+		if err != nil {
+			return
+		}
+	case int:
+		delayNanoseconds = time.Duration(v * 1000000000) // because it must be in nanoseconds and incoming is in seconds
+	case float64:
+		delayNanoseconds = time.Duration(int64(v) * 1000000000) // because it must be in nanoseconds and incoming is in seconds
+	default:
+		delayNanoseconds = 0
+	}
+	return
 }
 
 func NewAction() *Action {
