@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -177,7 +177,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	}
 
 	var id, name, phrase, fpath, group string
-	var delay time.Duration // in nanoseconds
+	var delaySeconds int64
 	var uid uuid.UUID
 	var ok bool
 
@@ -214,7 +214,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	phrase, _ = sayItem["Phrase"].(string)
 	fpath, _ = sayItem["FilePath"].(string)
 	group, _ = sayItem["Group"].(string)
-	if delay, err = castDelay(sayItem["Delay"]); err != nil {
+	if delaySeconds, err = castDelay(sayItem["Delay"]); err != nil {
 		return err
 	}
 	a.SayItem = &SayAction{
@@ -222,7 +222,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 		Phrase:   phrase,
 		FilePath: fpath,
 		Group:    group,
-		Delay:    delay,
+		Delay:    delaySeconds,
 	}
 
 	if id, ok = moveItem["ID"].(string); ok && len(id) > 0 {
@@ -234,14 +234,14 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	name, _ = moveItem["Name"].(string)
 	fpath, _ = moveItem["FilePath"].(string)
 	group, _ = moveItem["Group"].(string)
-	if delay, err = castDelay(moveItem["Delay"]); err != nil {
+	if delaySeconds, err = castDelay(moveItem["Delay"]); err != nil {
 		return err
 	}
 	a.MoveItem = &MoveAction{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
-		Delay:    delay,
+		Delay:    delaySeconds,
 		Group:    group,
 	}
 
@@ -254,33 +254,33 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	name, _ = imageItem["Name"].(string)
 	fpath, _ = imageItem["FilePath"].(string)
 	group, _ = imageItem["Group"].(string)
-	if delay, err = castDelay(imageItem["Delay"]); err != nil {
+	if delaySeconds, err = castDelay(imageItem["Delay"]); err != nil {
 		return err
 	}
 	a.ImageItem = &ImageAction{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
-		Delay:    delay,
+		Delay:    delaySeconds,
 		Group:    group,
 	}
 
 	return nil
 }
 
-func castDelay(delay interface{}) (delayNanoseconds time.Duration, err error) {
-	switch v := delay.(type) { // for some reason, incoming value can by any of these types
+func castDelay(delay interface{}) (delaySeconds int64, err error) {
+	// incoming value can by any of these types
+	switch v := delay.(type) {
 	case string:
-		delayNanoseconds, err = time.ParseDuration(v + "s")
-		if err != nil {
-			return
-		}
+		var delaySecondsInt int
+		delaySecondsInt, err = strconv.Atoi(v)
+		delaySeconds = int64(delaySecondsInt)
 	case int:
-		delayNanoseconds = time.Duration(v * 1000000000) // because it must be in nanoseconds and incoming is in seconds
+		delaySeconds = int64(v)
 	case float64:
-		delayNanoseconds = time.Duration(int64(v) * 1000000000) // because it must be in nanoseconds and incoming is in seconds
+		delaySeconds = int64(v)
 	default:
-		delayNanoseconds = 0
+		delaySeconds = 0
 	}
 	return
 }
@@ -354,7 +354,7 @@ type SayAction struct {
 	Phrase   string
 	FilePath string
 	Group    string
-	Delay    time.Duration
+	Delay    int64 // in seconds
 }
 
 func (item *SayAction) Command() Command {
@@ -370,7 +370,7 @@ func (item *SayAction) Content() (b []byte, err error) {
 }
 
 func (item *SayAction) DelayMillis() int64 {
-	return item.Delay.Milliseconds()
+	return item.Delay * 1000
 }
 
 //func (item *SayAction) String() string {
@@ -404,7 +404,7 @@ type MoveAction struct {
 	ID       uuid.UUID
 	Name     string
 	FilePath string
-	Delay    time.Duration
+	Delay    int64 // in seconds
 	Group    string
 }
 
@@ -431,7 +431,7 @@ func (item *MoveAction) Content() (b []byte, err error) {
 }
 
 func (item *MoveAction) DelayMillis() int64 {
-	return item.Delay.Milliseconds()
+	return item.Delay * 1000
 }
 
 //func (item *MoveAction) String() string {
@@ -468,7 +468,7 @@ type ImageAction struct {
 	ID       uuid.UUID
 	Name     string
 	FilePath string
-	Delay    time.Duration
+	Delay    int64 // in seconds
 	Group    string
 }
 
@@ -498,7 +498,7 @@ func (item *ImageAction) DelayMillis() int64 {
 	if item == nil {
 		return 0
 	}
-	return item.Delay.Milliseconds()
+	return item.Delay * 1000
 }
 
 //func (item *ImageAction) String() string {
