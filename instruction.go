@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,12 +18,20 @@ import (
 
 // Instruction interface
 
+// Instruction is the main interface to a robot, which allows to send commands and necessary data.
 type Instruction interface {
+	// Command returns one of Pepper commands, it signifies what kind of this instruction is.
 	Command() Command
+	// Content returns a payload and an error for an instruction.
 	Content() ([]byte, error)
+	// DelayMillis returns time in milliseconds an instruction should be delayed for.
 	DelayMillis() int64
+	// GetName returns a name of the instruction for whatever reason one might need it.
 	GetName() string
+	// IsValid is true, when an instruction is not nil, but initialized incorrectly
+	// or contains incorrect or insufficient data.
 	IsValid() bool
+	// IsNil is true, when an instruction is empty and uninitialized.
 	IsNil() bool
 }
 
@@ -36,14 +45,14 @@ type PepperMessage struct {
 func (pm PepperMessage) MarshalJSON() ([]byte, error) {
 	v := map[string]interface{}{
 		"command": pm.Command.String(),
-		"content": string(pm.Content),
+		"content": pm.Content,
 		"name":    pm.Name,
 		"delay":   pm.Delay,
 	}
 	return json.Marshal(v)
 }
 
-// sendInstruction sends an instruction via a web socket.
+// sendInstruction sends an instruction to a robot via a web socket.
 func sendInstruction(instruction Instruction, connection *websocket.Conn) error {
 	if connection == nil {
 		return fmt.Errorf("websocket connection is nil, Pepper must initiate it first")
@@ -63,12 +72,12 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 
 	if instruction.Command() == ActionCommand { // unpacking the wrapper and sending three actions sequentially
 		// NOTE: actually, we send only a motion and image now, because audio is played via a speaker from a local computer
-		cmd := instruction.(*Action)
+		action := instruction.(*Action)
 
 		// first, trying to get the content of a file
-		if cmd.MoveItem != nil {
-			content, err := cmd.MoveItem.Content()
-			if err != nil && cmd.MoveItem.Name == "" {
+		if action.MoveItem != nil {
+			content, err := action.MoveItem.Content()
+			if err != nil && action.MoveItem.Name == "" {
 				// second, checking on the name presence and sending just a name,
 				// the move should be located on the Android app's side then
 				log.Printf("no motion content: %v", err)
@@ -77,12 +86,12 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 				err = nil
 			}
 
-			if len(content) > 0 || cmd.MoveItem.Name != "" {
+			if len(content) > 0 || action.MoveItem.Name != "" {
 				move := PepperMessage{
-					Command: cmd.MoveItem.Command(),
-					Name:    cmd.MoveItem.Name,
+					Command: action.MoveItem.Command(),
+					Name:    action.MoveItem.Name,
 					Content: base64.StdEncoding.EncodeToString(content),
-					Delay:   cmd.MoveItem.DelayMillis(),
+					Delay:   action.MoveItem.DelayMillis(),
 				}
 
 				if err := send(move, connection); err != nil {
@@ -92,20 +101,41 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 		}
 
 		// second, trying to get an image
-		if cmd.ImageItem != nil {
-			content, err := cmd.ImageItem.Content()
+		if action.ImageItem != nil {
+			content, err := action.ImageItem.Content()
 			if err != nil {
 				log.Println("no image content")
 				err = nil
 			} else {
 				image := PepperMessage{
-					Command: cmd.ImageItem.Command(),
+					Command: action.ImageItem.Command(),
 					Content: base64.StdEncoding.EncodeToString(content),
-					Name:    cmd.ImageItem.Name,
-					Delay:   cmd.ImageItem.DelayMillis(),
+					Name:    action.ImageItem.Name,
+					Delay:   action.ImageItem.DelayMillis(),
 				}
 
 				if err := send(image, connection); err != nil {
+					return err
+				}
+			}
+		}
+
+		// third, trying to get an URL
+		if action.URLItem != nil {
+			content, err := action.URLItem.Content()
+			if err != nil {
+				log.Println("no URL content")
+				err = nil
+			} else {
+				webURL := PepperMessage{
+					Command: action.URLItem.Command(),
+					Content: base64.StdEncoding.EncodeToString(content),
+					Name:    action.URLItem.Name,
+					Delay:   action.URLItem.DelayMillis(),
+				}
+
+				log.Printf("sending url: %+v", webURL)
+				if err := send(webURL, connection); err != nil {
 					return err
 				}
 			}
@@ -132,7 +162,17 @@ func sendInstruction(instruction Instruction, connection *websocket.Conn) error 
 	return nil
 }
 
+// Command is a type which helps to enumerate and make clear all possible commands for a robot.
 type Command int
+
+// Pepper commands enumeration
+const (
+	ActionCommand Command = iota
+	SayCommand
+	MoveCommand
+	ShowImageCommand
+	ShowURLCommand
+)
 
 func (c Command) String() string {
 	switch c {
@@ -144,22 +184,16 @@ func (c Command) String() string {
 		return "sayAndMove"
 	case ShowImageCommand:
 		return "show_image"
+	case ShowURLCommand:
+		return "show_url"
 	}
 	return ""
 }
 
-// possible Pepper commands
-const (
-	ActionCommand Command = iota
-	SayCommand
-	MoveCommand
-	ShowImageCommand
-)
-
 // Action implements Instruction
 
-// Action is a wrapper around other elemental actions. This type is never sent over
-// a web socket on itself. sendInstruction should take care about it.
+// Action is a wrapper around other elemental actions. This type is never sent over a web socket on itself.
+// sendInstruction takes an Action and sends containing instructions one by one.
 type Action struct {
 	ID        uuid.UUID    `json:"ID" form:"ID"`
 	Name      string       `json:"Name" form:"Name" binding:"required"` // NOTE: not used in sessions
@@ -167,6 +201,7 @@ type Action struct {
 	SayItem   *SayAction   `json:"SayItem" form:"SayItem"`
 	MoveItem  *MoveAction  `json:"MoveItem" form:"MoveItem"`
 	ImageItem *ImageAction `json:"ImageItem" form:"ImageItem"`
+	URLItem   *URLAction   `json:"URLItem" form:"URLItem"`
 }
 
 func (a *Action) UnmarshalJSON(b []byte) error {
@@ -204,6 +239,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	sayItem, _ := m["SayItem"].(map[string]interface{})
 	moveItem, _ := m["MoveItem"].(map[string]interface{})
 	imageItem, _ := m["ImageItem"].(map[string]interface{})
+	urlItem, _ := m["URLItem"].(map[string]interface{})
 
 	if id, ok = sayItem["ID"].(string); ok && len(id) > 0 {
 		uid, err = uuid.Parse(id)
@@ -265,6 +301,33 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 		Group:    group,
 	}
 
+	if id, ok = urlItem["ID"].(string); ok && len(id) > 0 {
+		uid, err = uuid.Parse(id)
+		if err != nil {
+			return err
+		}
+	}
+	name, _ = urlItem["Name"].(string)
+	group, _ = urlItem["Group"].(string)
+	var urlString string
+	if s, ok := urlItem["URL"].(string); ok {
+		u, err := url.Parse(s) // parsing in order to ensure that the provided string is URL
+		if err != nil {
+			return err
+		}
+		urlString = u.String() // but storing it back as string
+	}
+	if delaySeconds, err = castDelay(urlItem["Delay"]); err != nil {
+		return err
+	}
+	a.URLItem = &URLAction{
+		ID:    uid,
+		Name:  name,
+		URL:   urlString,
+		Delay: delaySeconds,
+		Group: group,
+	}
+
 	return nil
 }
 
@@ -314,37 +377,52 @@ func NewAction() *Action {
 	}
 }
 
-func (item *Action) IsValid() bool {
-	if item == nil {
+func (a *Action) IsValid() bool {
+	if a == nil {
 		return false
 	}
-	if _, err := uuid.Parse(item.ID.String()); err != nil {
+
+	if _, err := uuid.Parse(a.ID.String()); err != nil {
 		return false
 	}
-	if !item.SayItem.IsValid() && !item.MoveItem.IsValid() && !item.ImageItem.IsValid() {
+	if !a.SayItem.IsValid() &&
+		!a.MoveItem.IsValid() &&
+		!a.ImageItem.IsValid() &&
+		!a.URLItem.IsValid() {
 		return false
 	}
 	return true
 }
 
-func (item *Action) Command() Command {
+func (a *Action) Command() Command {
 	return ActionCommand
 }
 
-func (item *Action) Content() (b []byte, err error) {
+func (a *Action) Content() (b []byte, err error) {
 	return
 }
 
-func (item *Action) DelayMillis() int64 {
+func (a *Action) DelayMillis() int64 {
 	return 0
 }
 
-func (item *Action) IsNil() bool {
-	return item == nil
+func (a *Action) IsNil() bool {
+	if a == nil {
+		return true
+	}
+
+	if a.SayItem.IsNil() &&
+		a.MoveItem.IsNil() &&
+		a.ImageItem.IsNil() &&
+		a.URLItem.IsNil() {
+		return true
+	}
+
+	return false
 }
 
-func (item *Action) GetName() string {
-	return item.MoveItem.Name
+func (a *Action) GetName() string {
+	return a.MoveItem.Name
 }
 
 // SayAction implements Instruction
@@ -373,20 +451,21 @@ func (item *SayAction) DelayMillis() int64 {
 	return item.Delay * 1000
 }
 
-//func (item *SayAction) String() string {
-//	return fmt.Sprintf("say %s from %s", item.Phrase, item.FilePath)
-//}
-
 func (item *SayAction) IsValid() bool {
+	// nil action is valid, because an action can contain empty SayItem,
+	// ImageItem but non-nil URLItem, for example
 	if item == nil {
-		return false
+		return true
 	}
+
+	// if non-nil, check other fields
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
 	if item.FilePath == "" && item.Phrase == "" {
 		return false
 	}
+
 	return true
 }
 
@@ -434,17 +513,14 @@ func (item *MoveAction) DelayMillis() int64 {
 	return item.Delay * 1000
 }
 
-//func (item *MoveAction) String() string {
-//	if item == nil {
-//		return ""
-//	}
-//	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
-//}
-
 func (item *MoveAction) IsValid() bool {
+	// nil action is valid, because an action can contain empty SayItem,
+	// ImageItem but non-nil URLItem, for example
 	if item == nil {
-		return false
+		return true
 	}
+
+	// if non-nil, check other fields
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
@@ -473,7 +549,7 @@ type ImageAction struct {
 }
 
 func (item *ImageAction) Command() Command {
-	return ShowImageCommand
+	return ShowURLCommand
 }
 
 func (item *ImageAction) Content() (b []byte, err error) {
@@ -501,17 +577,14 @@ func (item *ImageAction) DelayMillis() int64 {
 	return item.Delay * 1000
 }
 
-//func (item *ImageAction) String() string {
-//	if item == nil {
-//		return ""
-//	}
-//	return fmt.Sprintf("move %s from %s", item.Name, item.FilePath)
-//}
-
 func (item *ImageAction) IsValid() bool {
+	// nil action is valid, because an action can contain empty SayItem,
+	// ImageItem but non-nil URLItem, for example
 	if item == nil {
-		return false
+		return true
 	}
+
+	// if non-nil, check other fields
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
@@ -526,5 +599,64 @@ func (item *ImageAction) IsNil() bool {
 }
 
 func (item *ImageAction) GetName() string {
+	return item.Name
+}
+
+// URLAction implements Instruction
+
+type URLAction struct {
+	ID    uuid.UUID
+	Name  string
+	URL   string
+	Delay int64 // in seconds
+	Group string
+}
+
+func (item *URLAction) Command() Command {
+	return ShowURLCommand
+}
+
+func (item *URLAction) Content() (b []byte, err error) {
+	if item.IsNil() {
+		return b, fmt.Errorf("nil item")
+	}
+
+	if item.URL == "" {
+		return b, fmt.Errorf("URL is empty")
+	}
+
+	return []byte(item.URL), nil
+}
+
+func (item *URLAction) DelayMillis() int64 {
+	if item == nil {
+		return 0
+	}
+	return item.Delay * 1000
+}
+
+func (item *URLAction) IsValid() bool {
+	// nil action is valid, because an action can contain empty SayItem,
+	// ImageItem but non-nil URLItem, for example
+	if item == nil {
+		return true
+	}
+
+	// if non-nil, check other fields
+	if _, err := uuid.Parse(item.ID.String()); err != nil {
+		return false
+	}
+	if item.URL == "" {
+		return false
+	}
+
+	return true
+}
+
+func (item *URLAction) IsNil() bool {
+	return item == nil
+}
+
+func (item *URLAction) GetName() string {
 	return item.Name
 }

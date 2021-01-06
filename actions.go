@@ -72,6 +72,9 @@ func (s *ActionsStore) Create(a *Action) error {
 	if !a.IsValid() {
 		return fmt.Errorf("action is not valid")
 	}
+	if a.IsNil() {
+		return fmt.Errorf("action is nil")
+	}
 	s.mu.Lock()
 	s.Items = append(s.Items, a)
 	s.mu.Unlock()

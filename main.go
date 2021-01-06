@@ -96,29 +96,20 @@ func main() {
 
 	// Routes
 
+	// main router
 	r := gin.New()
-
-	// Middleware
+	// middleware
 	r.Use(allowCORS)
-
-	// JSON: robot API
-	r.GET("/pepper/initiate", initiateHandler)
-	//r.POST("/pepper/send_command", sendCommandHandler)
-	//r.OPTIONS("/pepper/send_command", func(c *gin.Context) {
-	//	c.String(http.StatusOK, "")
-	//})
-
-	// Static assets
+	// static assets
 	r.Static("/data", "data")
 
-	// JSON: UI API
-
-	// pepper API
+	// pepper communication
+	r.GET("/api/pepper/initiate", initiateHandler)
 	r.GET("/api/pepper/status", pepperStatusJSONHandler)
 	r.POST("/api/pepper/send_command", sendCommandHandler)
 	r.OPTIONS("/api/pepper/send_command", emptyResponseOK)
 
-	// sessions API
+	// sessions management
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
 	r.OPTIONS("/api/sessions/", emptyResponseOK)
@@ -129,6 +120,7 @@ func main() {
 	r.GET("/api/session_items/:id", getSessionItemJSONHandler)
 	r.OPTIONS("/api/session_items/:id", emptyResponseOK)
 
+	// ?
 	r.GET("/api/instructions/:id", getInstructionJSONHandler)
 	r.DELETE("/api/instructions/:id", deleteInstructionJSONHandler)
 	r.OPTIONS("/api/instructions/:id", emptyResponseOK)
@@ -143,11 +135,13 @@ func main() {
 	r.POST("/api/upload/move", moveUploadJSONHandler)
 	r.OPTIONS("/api/upload/move", emptyResponseOK)
 
+	// serving moveStore
 	r.GET("/api/moves/", movesJSONHandler)
 	r.GET("/api/moves/:id", getMoveJSONHandler)
 	r.DELETE("/api/moves/:id", deleteMoveJSONHandler)
 	r.OPTIONS("/api/moves/:id", emptyResponseOK)
 
+	// serving audioStore
 	r.GET("/api/audio/", audioJSONHandler)
 	r.POST("/api/audio/", createAudioJSONHandler)
 	r.OPTIONS("/api/audio/", emptyResponseOK)
@@ -155,20 +149,20 @@ func main() {
 	r.DELETE("/api/audio/:id", deleteAudioJSONHandler)
 	r.OPTIONS("/api/audio/:id", emptyResponseOK)
 
+	// serving actionsStore
 	r.GET("/api/actions/", actionsJSONHandler)
 	r.POST("/api/actions/", createActionJSONHandler)
 	r.OPTIONS("/api/actions/", emptyResponseOK)
 	r.DELETE("/api/actions/:id", deleteActionJSONHandler)
 	r.OPTIONS("/api/actions/:id", emptyResponseOK)
 
-	// utilities
+	// utilities: helpful endpoints for the client application or other
 	r.GET("/api/data/export", exportDataJSONHandler)
-	//r.POST("/api/data/import", importDataJSONHandler)
 	r.OPTIONS("/api/data/export", emptyResponseOK)
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
-	//r.GET("/api/auth/", authJSONHandler)
 	r.GET("/api/server_ip", getServerIPJSONHandler)
 
+	// main fallback: nothing to serve here at the moment, but could be a place for API documentation
 	r.GET("/", emptyResponseOK)
 
 	log.Fatal(r.Run(*servingAddr))
@@ -251,7 +245,7 @@ func sendCommandHandler(c *gin.Context) {
 		})
 		return
 	}
-	if !action.IsValid() {
+	if !action.IsValid() || action.IsNil() {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":  "got an invalid instruction",
 			"method": "sendCommandHandler",
