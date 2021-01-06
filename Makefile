@@ -7,3 +7,6 @@ windows:
 
 darwin:
 	rm -r $(OSX_DIR)/*; GOOS=darwin GOARCH=amd64 go build -o $(OSX_DIR)/$(BIN_NAME) .; cp -r data $(OSX_DIR)
+
+run:
+	go run .
