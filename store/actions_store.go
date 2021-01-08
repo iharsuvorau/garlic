@@ -13,14 +13,14 @@ import (
 	"github.com/iharsuvorau/garlic/instruction"
 )
 
-type ActionsStore struct {
+type Actions struct {
 	Items []*instruction.Action
 
 	filepath string
 	mu       sync.RWMutex
 }
 
-func NewActionsStore(fpath string) (*ActionsStore, error) {
+func NewActionsStore(fpath string) (*Actions, error) {
 	var file *os.File
 	_, err := os.Stat(fpath)
 	if os.IsNotExist(err) {
@@ -33,7 +33,7 @@ func NewActionsStore(fpath string) (*ActionsStore, error) {
 	}
 	defer file.Close()
 
-	store := &ActionsStore{
+	store := &Actions{
 		filepath: fpath,
 		Items:    []*instruction.Action{},
 	}
@@ -44,7 +44,7 @@ func NewActionsStore(fpath string) (*ActionsStore, error) {
 	return store, store.dump()
 }
 
-func (s *ActionsStore) GetByUUID(id uuid.UUID) (*instruction.Action, error) {
+func (s *Actions) GetByUUID(id uuid.UUID) (*instruction.Action, error) {
 	for _, s := range s.Items {
 		if s.ID == id {
 			return s, nil
@@ -54,7 +54,7 @@ func (s *ActionsStore) GetByUUID(id uuid.UUID) (*instruction.Action, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *ActionsStore) Get(id string) (*instruction.Action, error) {
+func (s *Actions) Get(id string) (*instruction.Action, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *ActionsStore) Get(id string) (*instruction.Action, error) {
 	return nil, fmt.Errorf("not found: %v", id)
 }
 
-func (s *ActionsStore) Create(a *instruction.Action) error {
+func (s *Actions) Create(a *instruction.Action) error {
 	if (a.ID == uuid.UUID{}) {
 		a.ID = uuid.Must(uuid.NewRandom())
 	}
@@ -83,7 +83,7 @@ func (s *ActionsStore) Create(a *instruction.Action) error {
 	return s.dump()
 }
 
-func (s *ActionsStore) Update(updatedAction *instruction.Action) error {
+func (s *Actions) Update(updatedAction *instruction.Action) error {
 	s.mu.Lock()
 	for _, s := range s.Items {
 		if s.ID == updatedAction.ID {
@@ -95,7 +95,7 @@ func (s *ActionsStore) Update(updatedAction *instruction.Action) error {
 	return s.dump()
 }
 
-func (s *ActionsStore) Delete(id string) error {
+func (s *Actions) Delete(id string) error {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (s *ActionsStore) Delete(id string) error {
 	return s.dump()
 }
 
-func (s *ActionsStore) GetGroups() []string {
+func (s *Actions) GetGroups() []string {
 	var groupsMap = map[string]interface{}{}
 
 	for _, v := range s.Items {
@@ -158,7 +158,7 @@ func (s *ActionsStore) GetGroups() []string {
 	return groups
 }
 
-func (s *ActionsStore) dump() error {
+func (s *Actions) dump() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

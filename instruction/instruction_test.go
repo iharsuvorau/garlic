@@ -1,4 +1,4 @@
-package main
+package instruction
 
 //
 //func TestPepperMessage_MarshalJSON(t *testing.T) {

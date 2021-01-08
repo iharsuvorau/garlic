@@ -41,8 +41,7 @@ var (
 	sessionsStore *store.Sessions
 	moveStore     *store.Moves
 	audioStore    *store.Audio
-	actionsStore  *store.ActionsStore
-	//imageStore    *Images
+	actionsStore  *store.Actions
 
 	pepperStatus uint8 // 0 -- disconnected, 1 -- connected
 )
@@ -56,49 +55,40 @@ var (
 func main() {
 	flag.Parse()
 
-	// Initialization of essential variables
-
+	// initialization of essential variables
 	var err error
-
-	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
-
-	fileStore = store.NewFileStore("data/uploads")
-
-	sessionsStore, err = store.NewSessionStore("data/sessions.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	moveStore, err = store.NewMoveStore("data/moves.json", *motionsDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("%v moves in the database", len(moveStore.Moves))
-
-	//imageStore, err = NewImageStore("data/images.json")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//log.Printf("%v moves in the database", len(moveStore.Moves))
-
-	audioStore, err = store.NewSayStore("data/audio.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	actionsStore, err = store.NewActionsStore("data/actions.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if ip, err := externalIP(); err == nil {
 		log.Printf("IP of the machine: %v", ip)
 	} else {
 		log.Printf("failed to get IP of the machine: %v", err)
 	}
+	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	// Routes
+	// creating new stores or loading ones which exist
+	fileStore = store.NewFileStore("data/uploads")
+	sessionsStore, err = store.NewSessionStore("data/sessions.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	moveStore, err = store.NewMoveStore("data/moves.json", *motionsDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%v moves in the database", len(moveStore.Moves))
+	audioStore, err = store.NewAudioStore("data/audio.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	actionsStore, err = store.NewActionsStore("data/actions.json")
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	engine := newEngine()
+	log.Fatal(engine.Run(*servingAddr))
+}
+
+func newEngine() *gin.Engine {
 	// main router
 	r := gin.New()
 	// middleware
@@ -168,7 +158,7 @@ func main() {
 	// main fallback: nothing to serve here at the moment, but could be a place for API documentation
 	r.GET("/", emptyResponseOK)
 
-	log.Fatal(r.Run(*servingAddr))
+	return r
 }
 
 // Middleware

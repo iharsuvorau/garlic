@@ -20,7 +20,7 @@ type Audio struct {
 	mu       sync.RWMutex
 }
 
-func NewSayStore(fpath string) (*Audio, error) {
+func NewAudioStore(fpath string) (*Audio, error) {
 	var file *os.File
 	_, err := os.Stat(fpath)
 	if os.IsNotExist(err) {
