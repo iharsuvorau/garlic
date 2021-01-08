@@ -24,7 +24,7 @@ func Test_collectMotions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := collectMoves(tt.args.dataDir)
+			got, err := store.collectMoves(tt.args.dataDir)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("collectMoves() error = %v, wantErr %v", err, tt.wantErr)
 				return

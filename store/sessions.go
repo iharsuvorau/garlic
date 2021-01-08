@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/iharsuvorau/garlic/instructions"
+	"github.com/iharsuvorau/garlic/instruction"
 )
 
 // Session represents a session with a child, a set of questions and simple answers which
@@ -70,18 +70,18 @@ func (s *Session) initializeIDs() {
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
 	ID      uuid.UUID
-	Actions []*instructions.Action // the first item of Actions is the main item, usually, it's the main question
+	Actions []*instruction.Action // the first item of Actions is the main item, usually, it's the main question
 	// of the session item, other actions are some kind of conversation supportive answers
 }
 
-type SessionStore struct {
+type Sessions struct {
 	Sessions []*Session
 
 	filepath string
 	mu       sync.RWMutex
 }
 
-func NewSessionStore(fpath string) (*SessionStore, error) {
+func NewSessionStore(fpath string) (*Sessions, error) {
 	var file *os.File
 	_, err := os.Stat(fpath)
 	if os.IsNotExist(err) {
@@ -104,13 +104,13 @@ func NewSessionStore(fpath string) (*SessionStore, error) {
 		for _, item := range s.Items {
 			for _, action := range item.Actions {
 				if action.ImageItem == nil {
-					action.ImageItem = &instructions.ImageAction{}
+					action.ImageItem = &instruction.ShowImage{}
 				}
 			}
 		}
 	}
 
-	store := &SessionStore{
+	store := &Sessions{
 		filepath: fpath,
 		Sessions: sessions,
 	}
@@ -120,7 +120,7 @@ func NewSessionStore(fpath string) (*SessionStore, error) {
 
 // GetAction looks for a top level instruction, which unites Say and Move actions
 // and presents them as a union of two actions, so both actions should be executed.
-func (s *SessionStore) GetAction(id uuid.UUID) *instructions.Action {
+func (s *Sessions) GetAction(id uuid.UUID) *instruction.Action {
 	for _, session := range s.Sessions {
 		for _, item := range session.Items {
 			for _, action := range item.Actions {
@@ -147,7 +147,7 @@ func (s *SessionStore) GetAction(id uuid.UUID) *instructions.Action {
 	return nil
 }
 
-func (s *SessionStore) Get(id string) (*Session, error) {
+func (s *Sessions) Get(id string) (*Session, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (s *SessionStore) Get(id string) (*Session, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *SessionStore) GetItem(id string) (*SessionItem, error) {
+func (s *Sessions) GetItem(id string) (*SessionItem, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (s *SessionStore) GetItem(id string) (*SessionItem, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-//func (s *SessionStore) FindAction(id string) (interface{}, error) {
+//func (s *Sessions) FindAction(id string) (interface{}, error) {
 //	uid, err := uuid.Parse(id)
 //	if err != nil {
 //		return nil, err
@@ -209,7 +209,7 @@ func (s *SessionStore) GetItem(id string) (*SessionItem, error) {
 //	return nil, fmt.Errorf("not found")
 //}
 
-func (s *SessionStore) Create(newSession *Session) error {
+func (s *Sessions) Create(newSession *Session) error {
 	newSession.initializeIDs()
 	s.mu.Lock()
 	s.Sessions = append(s.Sessions, newSession)
@@ -217,7 +217,7 @@ func (s *SessionStore) Create(newSession *Session) error {
 	return s.dump()
 }
 
-func (s *SessionStore) Update(updatedSession *Session) error {
+func (s *Sessions) Update(updatedSession *Session) error {
 	updatedSession.initializeIDs()
 	for _, s := range s.Sessions {
 		if s.ID == updatedSession.ID {
@@ -227,7 +227,7 @@ func (s *SessionStore) Update(updatedSession *Session) error {
 	return s.dump()
 }
 
-func (s *SessionStore) Delete(id string) error {
+func (s *Sessions) Delete(id string) error {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return err
@@ -273,25 +273,25 @@ func (s *SessionStore) Delete(id string) error {
 	return s.dump()
 }
 
-func (s *SessionStore) DeleteInstruction(id string) error {
+func (s *Sessions) DeleteInstruction(id string) error {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return err
 	}
 
 	// removing instruction's files
-	instruction := s.GetAction(uid)
-	if instruction != nil {
-		if instruction.SayItem != nil && len(instruction.SayItem.FilePath) > 0 {
-			err = os.Remove(instruction.SayItem.FilePath)
+	action := s.GetAction(uid)
+	if action != nil {
+		if action.SayItem != nil && len(action.SayItem.FilePath) > 0 {
+			err = os.Remove(action.SayItem.FilePath)
 			if err != nil {
 				log.Println(fmt.Errorf("failed to remove audio from the action: %v", err))
 			}
 		}
-		if instruction.ImageItem != nil && instruction.ImageItem.FilePath != "" {
-			err = os.Remove(instruction.ImageItem.FilePath)
+		if action.ImageItem != nil && action.ImageItem.FilePath != "" {
+			err = os.Remove(action.ImageItem.FilePath)
 			if err != nil {
-				log.Println(fmt.Errorf("failed to remove image %s from the action: %v", instruction.ImageItem.FilePath, err))
+				log.Println(fmt.Errorf("failed to remove image %s from the action: %v", action.ImageItem.FilePath, err))
 			}
 		}
 	}
@@ -299,9 +299,9 @@ func (s *SessionStore) DeleteInstruction(id string) error {
 	// removing the instruction
 	for _, session := range s.Sessions {
 		for _, item := range session.Items {
-			for _, instruction := range item.Actions {
-				if instruction.ID == uid {
-					newActions := []*instructions.Action{}
+			for _, action := range item.Actions {
+				if action.ID == uid {
+					newActions := []*instruction.Action{}
 					for _, action := range item.Actions {
 						if action.ID == uid {
 							continue
@@ -320,7 +320,7 @@ func (s *SessionStore) DeleteInstruction(id string) error {
 	return s.dump()
 }
 
-func (s *SessionStore) dump() error {
+func (s *Sessions) dump() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

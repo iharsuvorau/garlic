@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"encoding/json"
@@ -10,17 +10,17 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/iharsuvorau/garlic/instructions"
+	"github.com/iharsuvorau/garlic/instruction"
 )
 
-type ImageStore struct {
-	Images []*instructions.ImageAction
+type Images struct {
+	Images []*instruction.ShowImage
 
 	filepath string
 	mu       sync.RWMutex
 }
 
-func NewImageStore(fpath string) (*ImageStore, error) {
+func NewImageStore(fpath string) (*Images, error) {
 	var file *os.File
 	_, err := os.Stat(fpath)
 	if os.IsNotExist(err) {
@@ -33,7 +33,7 @@ func NewImageStore(fpath string) (*ImageStore, error) {
 	}
 	defer file.Close()
 
-	store := &ImageStore{filepath: fpath}
+	store := &Images{filepath: fpath}
 	if err = json.NewDecoder(file).Decode(&store.Images); err != nil && err != io.EOF {
 		return nil, fmt.Errorf("can't decode images from %s: %v", fpath, err)
 	}
@@ -41,7 +41,7 @@ func NewImageStore(fpath string) (*ImageStore, error) {
 	return store, store.dump()
 }
 
-func (s *ImageStore) GetByUUID(id uuid.UUID) (*instructions.ImageAction, error) {
+func (s *Images) GetByUUID(id uuid.UUID) (*instruction.ShowImage, error) {
 	for _, v := range s.Images {
 		if v.ID == id {
 			return v, nil
@@ -51,7 +51,7 @@ func (s *ImageStore) GetByUUID(id uuid.UUID) (*instructions.ImageAction, error) 
 	return nil, fmt.Errorf("not found")
 }
 
-//func (s *ImageStore) GetByName(name string) (*instructions.ImageAction, error) {
+//func (s *Images) GetByName(name string) (*instruction.ShowImage, error) {
 //	for _, v := range s.Images {
 //		if v.Name == name {
 //			return v, nil
@@ -61,7 +61,7 @@ func (s *ImageStore) GetByUUID(id uuid.UUID) (*instructions.ImageAction, error) 
 //	return nil, fmt.Errorf("not found")
 //}
 
-func (s *ImageStore) Get(id string) (*instructions.ImageAction, error) {
+func (s *Images) Get(id string) (*instruction.ShowImage, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (s *ImageStore) Get(id string) (*instructions.ImageAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *ImageStore) Create(v *instructions.ImageAction) error {
+func (s *Images) Create(v *instruction.ShowImage) error {
 	if (v.ID == uuid.UUID{}) {
 		return fmt.Errorf("failed to create an image: ID must be provided")
 	}
@@ -91,7 +91,7 @@ func (s *ImageStore) Create(v *instructions.ImageAction) error {
 	return s.dump()
 }
 
-func (s *ImageStore) Update(updatedImage *instructions.ImageAction) error {
+func (s *Images) Update(updatedImage *instruction.ShowImage) error {
 	s.mu.Lock()
 	for _, s := range s.Images {
 		if s.ID == updatedImage.ID {
@@ -103,7 +103,7 @@ func (s *ImageStore) Update(updatedImage *instructions.ImageAction) error {
 	return s.dump()
 }
 
-func (s *ImageStore) Delete(id string) error {
+func (s *Images) Delete(id string) error {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func (s *ImageStore) Delete(id string) error {
 		return err
 	}
 
-	newItems := []*instructions.ImageAction{}
+	newItems := []*instruction.ShowImage{}
 
 	for _, s := range s.Images {
 		if s.ID == uid {
@@ -133,7 +133,7 @@ func (s *ImageStore) Delete(id string) error {
 	return s.dump()
 }
 
-func (s *ImageStore) GetGroups() []string {
+func (s *Images) GetGroups() []string {
 	var groupsMap = map[string]interface{}{}
 
 	for _, v := range s.Images {
@@ -155,7 +155,7 @@ func (s *ImageStore) GetGroups() []string {
 	return groups
 }
 
-func (s *ImageStore) dump() error {
+func (s *Images) dump() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

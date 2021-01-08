@@ -1,4 +1,4 @@
-package instructions
+package instruction
 
 import (
 	"bytes"
@@ -10,15 +10,15 @@ import (
 )
 
 // Action is a wrapper around other primary actions. This type is never sent over a web socket on itself.
-// SendInstruction takes an Action and sends containing instructions one by one.
+// SendInstruction takes an Action and sends containing instruction one by one.
 type Action struct {
-	ID        uuid.UUID    `json:"ID" form:"ID"`
-	Name      string       `json:"Name" form:"Name" binding:"required"` // NOTE: not used in sessions
-	Group     string       `json:"Group" form:"Group"`                  // NOTE: not used in sessions
-	SayItem   *SayAction   `json:"SayItem" form:"SayItem"`
-	MoveItem  *MoveAction  `json:"MoveItem" form:"MoveItem"`
-	ImageItem *ImageAction `json:"ImageItem" form:"ImageItem"`
-	URLItem   *URLAction   `json:"URLItem" form:"URLItem"`
+	ID        uuid.UUID  `json:"ID" form:"ID"`
+	Name      string     `json:"Name" form:"Name" binding:"required"` // NOTE: not used in sessions
+	Group     string     `json:"Group" form:"Group"`                  // NOTE: not used in sessions
+	SayItem   *Say       `json:"SayItem" form:"SayItem"`
+	MoveItem  *Move      `json:"MoveItem" form:"MoveItem"`
+	ImageItem *ShowImage `json:"ImageItem" form:"ImageItem"`
+	URLItem   *ShowURI   `json:"URLItem" form:"URLItem"`
 }
 
 func (a *Action) UnmarshalJSON(b []byte) error {
@@ -70,7 +70,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	if delaySeconds, err = castDelay(sayItem["Delay"]); err != nil {
 		return err
 	}
-	a.SayItem = &SayAction{
+	a.SayItem = &Say{
 		ID:       uid,
 		Phrase:   phrase,
 		FilePath: fpath,
@@ -90,7 +90,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	if delaySeconds, err = castDelay(moveItem["Delay"]); err != nil {
 		return err
 	}
-	a.MoveItem = &MoveAction{
+	a.MoveItem = &Move{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
@@ -110,7 +110,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	if delaySeconds, err = castDelay(imageItem["Delay"]); err != nil {
 		return err
 	}
-	a.ImageItem = &ImageAction{
+	a.ImageItem = &ShowImage{
 		ID:       uid,
 		Name:     name,
 		FilePath: fpath,
@@ -137,7 +137,7 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 	if delaySeconds, err = castDelay(urlItem["Delay"]); err != nil {
 		return err
 	}
-	a.URLItem = &URLAction{
+	a.URLItem = &ShowURI{
 		ID:    uid,
 		Name:  name,
 		URL:   urlString,

@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"encoding/json"
@@ -10,32 +10,32 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/iharsuvorau/garlic/instructions"
+	"github.com/iharsuvorau/garlic/instruction"
 )
 
-type ActionsStore struct {
-	Items []*instructions.Action
+type Audio struct {
+	Items []*instruction.Say
 
 	filepath string
 	mu       sync.RWMutex
 }
 
-func NewActionsStore(fpath string) (*ActionsStore, error) {
+func NewSayStore(fpath string) (*Audio, error) {
 	var file *os.File
 	_, err := os.Stat(fpath)
 	if os.IsNotExist(err) {
 		file, err = os.Create(fpath)
 		if err != nil {
-			return nil, fmt.Errorf("can't create an actions store at %s: %v", fpath, err)
+			return nil, fmt.Errorf("can't create an audio store at %s: %v", fpath, err)
 		}
 	} else {
 		file, err = os.Open(fpath)
 	}
 	defer file.Close()
 
-	store := &ActionsStore{
+	store := &Audio{
 		filepath: fpath,
-		Items:    []*instructions.Action{},
+		Items:    []*instruction.Say{},
 	}
 	if err = json.NewDecoder(file).Decode(&store.Items); err != nil && err != io.EOF {
 		return nil, fmt.Errorf("can't decode audio items from %s: %v", fpath, err)
@@ -44,7 +44,7 @@ func NewActionsStore(fpath string) (*ActionsStore, error) {
 	return store, store.dump()
 }
 
-func (s *ActionsStore) GetByUUID(id uuid.UUID) (*instructions.Action, error) {
+func (s *Audio) GetByUUID(id uuid.UUID) (*instruction.Say, error) {
 	for _, s := range s.Items {
 		if s.ID == id {
 			return s, nil
@@ -54,7 +54,16 @@ func (s *ActionsStore) GetByUUID(id uuid.UUID) (*instructions.Action, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *ActionsStore) Get(id string) (*instructions.Action, error) {
+func (s *Audio) GetByPath(path string) (*instruction.Say, error) {
+	for _, action := range s.Items {
+		if action.FilePath == path {
+			return action, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (s *Audio) Get(id string) (*instruction.Say, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -67,27 +76,22 @@ func (s *ActionsStore) Get(id string) (*instructions.Action, error) {
 	return nil, fmt.Errorf("not found: %v", id)
 }
 
-func (s *ActionsStore) Create(a *instructions.Action) error {
-	if (a.ID == uuid.UUID{}) {
-		a.ID = uuid.Must(uuid.NewRandom())
+func (s *Audio) Create(m *instruction.Say) error {
+	if (m.ID == uuid.UUID{}) {
+		return fmt.Errorf("failed to create an audio: ID must be provided")
 	}
-	if !a.IsValid() {
-		return fmt.Errorf("action is not valid")
-	}
-	if a.IsNil() {
-		return fmt.Errorf("action is nil")
-	}
+
 	s.mu.Lock()
-	s.Items = append(s.Items, a)
+	s.Items = append(s.Items, m)
 	s.mu.Unlock()
 	return s.dump()
 }
 
-func (s *ActionsStore) Update(updatedAction *instructions.Action) error {
+func (s *Audio) Update(updatedAudio *instruction.Say) error {
 	s.mu.Lock()
 	for _, s := range s.Items {
-		if s.ID == updatedAction.ID {
-			*s = *updatedAction
+		if s.ID == updatedAudio.ID {
+			*s = *updatedAudio
 		}
 	}
 	s.mu.Unlock()
@@ -95,18 +99,18 @@ func (s *ActionsStore) Update(updatedAction *instructions.Action) error {
 	return s.dump()
 }
 
-func (s *ActionsStore) Delete(id string) error {
+func (s *Audio) Delete(id string) error {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return err
 	}
 
-	action, err := s.Get(id)
+	item, err := s.Get(id)
 	if err != nil {
 		return err
 	}
 
-	newItems := []*instructions.Action{}
+	newItems := []*instruction.Say{}
 
 	for _, s := range s.Items {
 		if s.ID == uid {
@@ -116,27 +120,41 @@ func (s *ActionsStore) Delete(id string) error {
 	}
 
 	s.mu.Lock()
-
-	// removing resources
-	if action.SayItem != nil && len(action.SayItem.FilePath) > 0 {
-		if err = removeFile(action.SayItem.FilePath); err != nil {
-			return err
-		}
+	if err = os.Remove(item.FilePath); err != nil {
+		return fmt.Errorf("failed to remove a file: %v", err)
 	}
-	if action.ImageItem != nil && len(action.ImageItem.FilePath) > 0 {
-		if err = removeFile(action.ImageItem.FilePath); err != nil {
-			return err
-		}
-	}
-	// TODO: we're not removing motions, some of them might be in the built-in data folder
-
 	s.Items = newItems
 	s.mu.Unlock()
 
 	return s.dump()
 }
 
-func (s *ActionsStore) GetGroups() []string {
+func (s *Audio) DeleteByPath(path string) error {
+	item, err := s.GetByPath(path)
+	if err != nil {
+		return err
+	}
+
+	newItems := []*instruction.Say{}
+
+	for _, s := range s.Items {
+		if s.ID == item.ID {
+			continue
+		}
+		newItems = append(newItems, s)
+	}
+
+	s.mu.Lock()
+	if err = os.Remove(item.FilePath); err != nil {
+		return fmt.Errorf("failed to remove a file: %v", err)
+	}
+	s.Items = newItems
+	s.mu.Unlock()
+
+	return s.dump()
+}
+
+func (s *Audio) GetGroups() []string {
 	var groupsMap = map[string]interface{}{}
 
 	for _, v := range s.Items {
@@ -158,7 +176,7 @@ func (s *ActionsStore) GetGroups() []string {
 	return groups
 }
 
-func (s *ActionsStore) dump() error {
+func (s *Audio) dump() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

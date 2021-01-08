@@ -1,10 +1,10 @@
 /*
-Package instructions provides types and functions for communication with Pepper. Instruction interface provides
+Package instruction provides types and functions for communication with Pepper. Instruction interface provides
 the interface for implementation of a more specific instruction, e.g. "Say Phrase", "Show Image", "Move", etc.
 This instruction can be sent to Pepper using SendInstruction(). Command type helps to enumerate actions implemented
 in the Android application and provide an explicit naming for it.
 */
-package instructions
+package instruction
 
 import (
 	"encoding/base64"
@@ -82,7 +82,7 @@ func (pm PepperMessage) MarshalJSON() ([]byte, error) {
 }
 
 // SendInstruction sends an instruction to a robot via a web socket.
-func SendInstruction(instruction Instruction, connection *websocket.Conn, mu *sync.Mutex) error {
+func SendInstruction(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) error {
 	if connection == nil {
 		return fmt.Errorf("websocket connection is nil, Pepper must initiate it first")
 	}
@@ -99,9 +99,9 @@ func SendInstruction(instruction Instruction, connection *websocket.Conn, mu *sy
 		return connection.WriteMessage(websocket.TextMessage, b)
 	}
 
-	if instruction.Command() == ActionCommand { // unpacking the wrapper and sending three actions sequentially
+	if instr.Command() == ActionCommand { // unpacking the wrapper and sending three actions sequentially
 		// NOTE: actually, we send only a motion and image now, because audio is played via a speaker from a local computer
-		action := instruction.(*Action)
+		action := instr.(*Action)
 
 		// first, trying to get the content of a file
 		if action.MoveItem != nil {
@@ -169,10 +169,10 @@ func SendInstruction(instruction Instruction, connection *websocket.Conn, mu *sy
 				}
 			}
 		}
-	} else { // just sending the instruction
+	} else { // just sending the instr
 		// TODO: this is never called probably
-		name := instruction.GetName()
-		content, err := instruction.Content()
+		name := instr.GetName()
+		content, err := instr.Content()
 		if err != nil && name == "" {
 			return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
 		} else {
@@ -180,10 +180,10 @@ func SendInstruction(instruction Instruction, connection *websocket.Conn, mu *sy
 		}
 
 		move := PepperMessage{
-			Command: instruction.Command(),
+			Command: instr.Command(),
 			Name:    name,
 			Content: base64.StdEncoding.EncodeToString(content),
-			Delay:   instruction.DelayMillis(),
+			Delay:   instr.DelayMillis(),
 		}
 		return send(move, connection)
 	}

@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"io"
@@ -6,17 +6,17 @@ import (
 	"path"
 )
 
-type FileStore struct {
+type Files struct {
 	base string
 }
 
-func NewFileStore(base string) *FileStore {
-	return &FileStore{
+func NewFileStore(base string) *Files {
+	return &Files{
 		base: base,
 	}
 }
 
-func (s *FileStore) Save(name string, src io.Reader) (string, error) {
+func (s *Files) Save(name string, src io.Reader) (string, error) {
 	dst := path.Join(s.base, name)
 
 	f, err := os.Create(dst)
@@ -32,7 +32,7 @@ func (s *FileStore) Save(name string, src io.Reader) (string, error) {
 	return dst, nil
 }
 
-func (s *FileStore) Get(name string) (*os.File, error) {
+func (s *Files) Get(name string) (*os.File, error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
@@ -40,6 +40,6 @@ func (s *FileStore) Get(name string) (*os.File, error) {
 	return f, nil
 }
 
-func (s *FileStore) Delete(filename string) error {
+func (s *Files) Delete(filename string) error {
 	return removeFile(filename)
 }

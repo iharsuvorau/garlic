@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"encoding/json"
@@ -12,17 +12,17 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/iharsuvorau/garlic/instructions"
+	"github.com/iharsuvorau/garlic/instruction"
 )
 
-func collectMoves(dataDir string) ([]*instructions.MoveAction, error) {
+func collectMoves(dataDir string) ([]*instruction.Move, error) {
 	query := filepath.Join(dataDir, "**/*.qianim")
 	matches, err := filepath.Glob(query)
 	if err != nil {
 		return nil, err
 	}
 
-	var items = make([]*instructions.MoveAction, len(matches))
+	var items = make([]*instruction.Move, len(matches))
 	for i := range matches {
 		// parsing the parent folder as a motion group name
 		dir, basename := filepath.Split(matches[i])
@@ -32,7 +32,7 @@ func collectMoves(dataDir string) ([]*instructions.MoveAction, error) {
 		name := strings.Replace(basename, filepath.Ext(basename), "", -1)
 
 		// appending a motion
-		items[i] = &instructions.MoveAction{
+		items[i] = &instruction.Move{
 			ID:       uuid.Must(uuid.NewRandom()),
 			FilePath: matches[i],
 			Group:    group,
@@ -43,14 +43,14 @@ func collectMoves(dataDir string) ([]*instructions.MoveAction, error) {
 	return items, err
 }
 
-type MoveStore struct {
-	Moves []*instructions.MoveAction
+type Moves struct {
+	Moves []*instruction.Move
 
 	filepath string
 	mu       sync.RWMutex
 }
 
-func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
+func NewMoveStore(fpath, providedMoves string) (*Moves, error) {
 	var isFreshDatabase bool
 
 	var file *os.File
@@ -66,7 +66,7 @@ func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
 	}
 	defer file.Close()
 
-	store := &MoveStore{filepath: fpath}
+	store := &Moves{filepath: fpath}
 	if err = json.NewDecoder(file).Decode(&store.Moves); err != nil && err != io.EOF {
 		return nil, fmt.Errorf("can't decode moves from %s: %v", fpath, err)
 	}
@@ -83,7 +83,7 @@ func NewMoveStore(fpath, providedMoves string) (*MoveStore, error) {
 	return store, store.dump()
 }
 
-func (s *MoveStore) GetByUUID(id uuid.UUID) (*instructions.MoveAction, error) {
+func (s *Moves) GetByUUID(id uuid.UUID) (*instruction.Move, error) {
 	for _, s := range s.Moves {
 		if s.ID == id {
 			return s, nil
@@ -93,7 +93,7 @@ func (s *MoveStore) GetByUUID(id uuid.UUID) (*instructions.MoveAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *MoveStore) GetByName(name string) (*instructions.MoveAction, error) {
+func (s *Moves) GetByName(name string) (*instruction.Move, error) {
 	for _, s := range s.Moves {
 		if s.Name == name {
 			return s, nil
@@ -103,7 +103,7 @@ func (s *MoveStore) GetByName(name string) (*instructions.MoveAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *MoveStore) Get(id string) (*instructions.MoveAction, error) {
+func (s *Moves) Get(id string) (*instruction.Move, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (s *MoveStore) Get(id string) (*instructions.MoveAction, error) {
 }
 
 // AddMany appends a move only if there is no another move with the same name and ID.
-func (s *MoveStore) AddMany(moves []*instructions.MoveAction) {
+func (s *Moves) AddMany(moves []*instruction.Move) {
 	s.mu.Lock()
 	for _, m := range moves {
 		shouldAppend := true
@@ -136,7 +136,7 @@ func (s *MoveStore) AddMany(moves []*instructions.MoveAction) {
 	s.mu.Unlock()
 }
 
-func (s *MoveStore) Create(m *instructions.MoveAction) error {
+func (s *Moves) Create(m *instruction.Move) error {
 	if (m.ID == uuid.UUID{}) {
 		return fmt.Errorf("failed to create a move: ID must be provided")
 	}
@@ -151,7 +151,7 @@ func (s *MoveStore) Create(m *instructions.MoveAction) error {
 	return s.dump()
 }
 
-func (s *MoveStore) Update(updatedMove *instructions.MoveAction) error {
+func (s *Moves) Update(updatedMove *instruction.Move) error {
 	s.mu.Lock()
 	for _, s := range s.Moves {
 		if s.ID == updatedMove.ID {
@@ -163,7 +163,7 @@ func (s *MoveStore) Update(updatedMove *instructions.MoveAction) error {
 	return s.dump()
 }
 
-func (s *MoveStore) Delete(id string) error {
+func (s *Moves) Delete(id string) error {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return err
@@ -174,7 +174,7 @@ func (s *MoveStore) Delete(id string) error {
 		return err
 	}
 
-	newMoves := []*instructions.MoveAction{}
+	newMoves := []*instruction.Move{}
 
 	for _, s := range s.Moves {
 		if s.ID == uid {
@@ -193,7 +193,7 @@ func (s *MoveStore) Delete(id string) error {
 	return s.dump()
 }
 
-func (s *MoveStore) GetGroups() []string {
+func (s *Moves) GetGroups() []string {
 	var groupsMap = map[string]interface{}{}
 
 	for _, v := range s.Moves {
@@ -215,7 +215,7 @@ func (s *MoveStore) GetGroups() []string {
 	return groups
 }
 
-func (s *MoveStore) dump() error {
+func (s *Moves) dump() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

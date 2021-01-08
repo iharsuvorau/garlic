@@ -1,4 +1,4 @@
-package instructions
+package instruction
 
 import (
 	"fmt"
@@ -8,9 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ImageAction implements Instruction
-
-type ImageAction struct {
+// Move implements Instruction
+type Move struct {
 	ID       uuid.UUID
 	Name     string
 	FilePath string
@@ -18,11 +17,11 @@ type ImageAction struct {
 	Group    string
 }
 
-func (item *ImageAction) Command() Command {
-	return ShowURLCommand
+func (item *Move) Command() Command {
+	return MoveCommand
 }
 
-func (item *ImageAction) Content() (b []byte, err error) {
+func (item *Move) Content() (b []byte, err error) {
 	if item.IsNil() {
 		return b, fmt.Errorf("nil item")
 	}
@@ -40,14 +39,11 @@ func (item *ImageAction) Content() (b []byte, err error) {
 	return ioutil.ReadAll(f)
 }
 
-func (item *ImageAction) DelayMillis() int64 {
-	if item == nil {
-		return 0
-	}
+func (item *Move) DelayMillis() int64 {
 	return item.Delay * 1000
 }
 
-func (item *ImageAction) IsValid() bool {
+func (item *Move) IsValid() bool {
 	// nil action is valid, because an action can contain empty SayItem,
 	// ImageItem but non-nil URLItem, for example
 	if item == nil {
@@ -58,16 +54,16 @@ func (item *ImageAction) IsValid() bool {
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
 		return false
 	}
-	if len(item.FilePath) == 0 {
+	if len(item.Name) == 0 || len(item.FilePath) == 0 {
 		return false
 	}
 	return true
 }
 
-func (item *ImageAction) IsNil() bool {
+func (item *Move) IsNil() bool {
 	return item == nil
 }
 
-func (item *ImageAction) GetName() string {
+func (item *Move) GetName() string {
 	return item.Name
 }

@@ -1,4 +1,4 @@
-package main
+package store
 
 //func TestSessionStore_Get(t *testing.T) {
 //	type fields struct {
@@ -20,7 +20,7 @@ package main
 //	}
 //	for _, tt := range tests {
 //		t.Run(tt.name, func(t *testing.T) {
-//			s := &SessionStore{
+//			s := &Sessions{
 //				filepath: tt.fields.filepath,
 //				Moves: tt.fields.Moves,
 //				mu:       tt.fields.mu,

@@ -1,4 +1,4 @@
-package instructions
+package instruction
 
 import (
 	"fmt"
@@ -6,9 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// URLAction implements Instruction
-
-type URLAction struct {
+// ShowURI implements Instruction
+type ShowURI struct {
 	ID    uuid.UUID
 	Name  string
 	URL   string
@@ -16,11 +15,11 @@ type URLAction struct {
 	Group string
 }
 
-func (item *URLAction) Command() Command {
+func (item *ShowURI) Command() Command {
 	return ShowURLCommand
 }
 
-func (item *URLAction) Content() (b []byte, err error) {
+func (item *ShowURI) Content() (b []byte, err error) {
 	if item.IsNil() {
 		return b, fmt.Errorf("nil item")
 	}
@@ -32,14 +31,14 @@ func (item *URLAction) Content() (b []byte, err error) {
 	return []byte(item.URL), nil
 }
 
-func (item *URLAction) DelayMillis() int64 {
+func (item *ShowURI) DelayMillis() int64 {
 	if item == nil {
 		return 0
 	}
 	return item.Delay * 1000
 }
 
-func (item *URLAction) IsValid() bool {
+func (item *ShowURI) IsValid() bool {
 	// nil action is valid, because an action can contain empty SayItem,
 	// ImageItem but non-nil URLItem, for example
 	if item == nil {
@@ -57,10 +56,10 @@ func (item *URLAction) IsValid() bool {
 	return true
 }
 
-func (item *URLAction) IsNil() bool {
+func (item *ShowURI) IsNil() bool {
 	return item == nil
 }
 
-func (item *URLAction) GetName() string {
+func (item *ShowURI) GetName() string {
 	return item.Name
 }

@@ -16,13 +16,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
-	"github.com/iharsuvorau/garlic/instructions"
+	"github.com/iharsuvorau/garlic/instruction"
+	"github.com/iharsuvorau/garlic/store"
 )
 
 // TODO: communicate over WSS
 // TODO: is there a need to keep WS connection live using ping-pong?
 // TODO: implement basic auth and logout
-// TODO: make abstraction separation clearer between Session and ImageStore, SayStore and FileStore
+// TODO: make abstraction separation clearer between Session and Images, Audio and Files
 // TODO: make so that SayItem is not compulsory, any Action could be there
 // NOTE: another approach to files: don't send them with each request, but serve as static files and send only URL
 
@@ -36,12 +37,12 @@ var (
 	wsConnection *websocket.Conn
 	wsMu         sync.Mutex
 
-	fileStore     *FileStore
-	sessionsStore *SessionStore
-	moveStore     *MoveStore
-	audioStore    *SayStore
-	actionsStore  *ActionsStore
-	//imageStore    *ImageStore
+	fileStore     *store.Files
+	sessionsStore *store.Sessions
+	moveStore     *store.Moves
+	audioStore    *store.Audio
+	actionsStore  *store.ActionsStore
+	//imageStore    *Images
 
 	pepperStatus uint8 // 0 -- disconnected, 1 -- connected
 )
@@ -61,14 +62,14 @@ func main() {
 
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	fileStore = NewFileStore("data/uploads")
+	fileStore = store.NewFileStore("data/uploads")
 
-	sessionsStore, err = NewSessionStore("data/sessions.json")
+	sessionsStore, err = store.NewSessionStore("data/sessions.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	moveStore, err = NewMoveStore("data/moves.json", *motionsDir)
+	moveStore, err = store.NewMoveStore("data/moves.json", *motionsDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,12 +81,12 @@ func main() {
 	//}
 	//log.Printf("%v moves in the database", len(moveStore.Moves))
 
-	audioStore, err = NewSayStore("data/audio.json")
+	audioStore, err = store.NewSayStore("data/audio.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	actionsStore, err = NewActionsStore("data/actions.json")
+	actionsStore, err = store.NewActionsStore("data/actions.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,9 +124,9 @@ func main() {
 	r.OPTIONS("/api/session_items/:id", emptyResponseOK)
 
 	// ?
-	r.GET("/api/instructions/:id", getInstructionJSONHandler)
-	r.DELETE("/api/instructions/:id", deleteInstructionJSONHandler)
-	r.OPTIONS("/api/instructions/:id", emptyResponseOK)
+	r.GET("/api/instruction/:id", getInstructionJSONHandler)
+	r.DELETE("/api/instruction/:id", deleteInstructionJSONHandler)
+	r.OPTIONS("/api/instruction/:id", emptyResponseOK)
 
 	// general upload API
 	r.POST("/api/upload/audio", audioUploadJSONHandler)
@@ -228,11 +229,11 @@ func sendCommandHandler(c *gin.Context) {
 		return
 	}
 
-	// We can receive three types of instructions: SayCommand, MoveCommand, ShowImageCommand.
+	// We can receive three types of instruction: SayCommand, MoveCommand, ShowImageCommand.
 	// In the first case, we just respond with OK status and the web browser will play an audio file for the instruction.
 	// If something is wrong, we reply with error and the sound won't be played.
 	// In the second and third cases, we push the command to a web socket for Pepper to execute.
-	var action instructions.Instruction
+	var action instruction.Instruction
 	action = sessionsStore.GetAction(form.ItemID)
 	if action.IsNil() {
 		action, _ = moveStore.GetByUUID(form.ItemID)
@@ -254,7 +255,7 @@ func sendCommandHandler(c *gin.Context) {
 		})
 		return
 	}
-	if err = instructions.SendInstruction(action, wsConnection, &wsMu); err != nil {
+	if err = instruction.SendInstruction(action, wsConnection, &wsMu); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -309,7 +310,7 @@ func sessionsJSONHandler(c *gin.Context) {
 }
 
 func updateSessionJSONHandler(c *gin.Context) {
-	var updatedSession Session
+	var updatedSession store.Session
 	err := c.BindJSON(&updatedSession)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -363,7 +364,7 @@ func deleteSessionJSONHandler(c *gin.Context) {
 }
 
 func createSessionJSONHandler(c *gin.Context) {
-	var newSession *Session
+	var newSession *store.Session
 
 	err := c.ShouldBindJSON(&newSession)
 	if err != nil {
@@ -409,7 +410,7 @@ func audioUploadJSONHandler(c *gin.Context) {
 		return
 	}
 
-	// NOTE: we don't create an object in SayStore, SayStore only for commonly used audio items,
+	// NOTE: we don't create an object in Audio, Audio only for commonly used audio items,
 	// session audio items should belong only to a session.
 
 	c.JSON(http.StatusOK, gin.H{
@@ -445,7 +446,7 @@ func createAudioJSONHandler(c *gin.Context) {
 	if group == "" {
 		group = "Default"
 	}
-	action := &instructions.SayAction{
+	action := &instruction.Say{
 		ID:       uid,
 		Phrase:   phrase,
 		FilePath: dst,
@@ -492,7 +493,7 @@ func moveUploadJSONHandler(c *gin.Context) {
 	if moveGroup == "" {
 		moveGroup = "Default"
 	}
-	move := &instructions.MoveAction{
+	move := &instruction.Move{
 		ID:       uid,
 		Name:     moveName,
 		FilePath: dst,
@@ -538,7 +539,7 @@ func imageUploadJSONHandler(c *gin.Context) {
 	//if group == "" {
 	//	group = "Default"
 	//}
-	//image := &ImageAction{
+	//image := &ShowImage{
 	//	ID:       uid,
 	//	Name:     imageName,
 	//	FilePath: dst,
@@ -666,7 +667,7 @@ func actionsJSONHandler(c *gin.Context) {
 }
 
 func createActionJSONHandler(c *gin.Context) {
-	newAction := new(instructions.Action)
+	newAction := new(instruction.Action)
 
 	err := c.ShouldBindJSON(&newAction)
 	if err != nil {
@@ -748,10 +749,10 @@ func getServerIPJSONHandler(c *gin.Context) {
 
 // Helpers
 
-func makeMoveActionsFromNames(names []string, group string) []*instructions.MoveAction {
-	moves := []*instructions.MoveAction{}
+func makeMoveActionsFromNames(names []string, group string) []*instruction.Move {
+	moves := []*instruction.Move{}
 	for _, n := range names {
-		moves = append(moves, &instructions.MoveAction{
+		moves = append(moves, &instruction.Move{
 			ID:       uuid.Must(uuid.NewRandom()),
 			Name:     n,
 			FilePath: "",

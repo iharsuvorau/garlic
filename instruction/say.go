@@ -1,4 +1,4 @@
-package instructions
+package instruction
 
 import (
 	"fmt"
@@ -7,9 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// SayAction implements Instruction
-
-type SayAction struct {
+// Say implements Instruction
+type Say struct {
 	ID       uuid.UUID
 	Phrase   string
 	FilePath string
@@ -17,11 +16,11 @@ type SayAction struct {
 	Delay    int64 // in seconds
 }
 
-func (item *SayAction) Command() Command {
+func (item *Say) Command() Command {
 	return SayCommand
 }
 
-func (item *SayAction) Content() (b []byte, err error) {
+func (item *Say) Content() (b []byte, err error) {
 	if item.IsNil() {
 		return b, fmt.Errorf("nil item")
 	}
@@ -29,11 +28,11 @@ func (item *SayAction) Content() (b []byte, err error) {
 	return []byte(filepath.Base(item.Phrase)), nil
 }
 
-func (item *SayAction) DelayMillis() int64 {
+func (item *Say) DelayMillis() int64 {
 	return item.Delay * 1000
 }
 
-func (item *SayAction) IsValid() bool {
+func (item *Say) IsValid() bool {
 	// nil action is valid, because an action can contain empty SayItem,
 	// ImageItem but non-nil URLItem, for example
 	if item == nil {
@@ -51,10 +50,10 @@ func (item *SayAction) IsValid() bool {
 	return true
 }
 
-func (item *SayAction) IsNil() bool {
+func (item *Say) IsNil() bool {
 	return item == nil
 }
 
-func (item *SayAction) GetName() string {
+func (item *Say) GetName() string {
 	return ""
 }
