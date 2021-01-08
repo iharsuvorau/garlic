@@ -3,15 +3,18 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"os"
 	"sort"
 	"sync"
+
+	"github.com/google/uuid"
+
+	"github.com/iharsuvorau/garlic/instructions"
 )
 
 type ImageStore struct {
-	Images []*ImageAction
+	Images []*instructions.ImageAction
 
 	filepath string
 	mu       sync.RWMutex
@@ -38,7 +41,7 @@ func NewImageStore(fpath string) (*ImageStore, error) {
 	return store, store.dump()
 }
 
-func (s *ImageStore) GetByUUID(id uuid.UUID) (*ImageAction, error) {
+func (s *ImageStore) GetByUUID(id uuid.UUID) (*instructions.ImageAction, error) {
 	for _, v := range s.Images {
 		if v.ID == id {
 			return v, nil
@@ -48,7 +51,7 @@ func (s *ImageStore) GetByUUID(id uuid.UUID) (*ImageAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-//func (s *ImageStore) GetByName(name string) (*ImageAction, error) {
+//func (s *ImageStore) GetByName(name string) (*instructions.ImageAction, error) {
 //	for _, v := range s.Images {
 //		if v.Name == name {
 //			return v, nil
@@ -58,7 +61,7 @@ func (s *ImageStore) GetByUUID(id uuid.UUID) (*ImageAction, error) {
 //	return nil, fmt.Errorf("not found")
 //}
 
-func (s *ImageStore) Get(id string) (*ImageAction, error) {
+func (s *ImageStore) Get(id string) (*instructions.ImageAction, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -73,7 +76,7 @@ func (s *ImageStore) Get(id string) (*ImageAction, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *ImageStore) Create(v *ImageAction) error {
+func (s *ImageStore) Create(v *instructions.ImageAction) error {
 	if (v.ID == uuid.UUID{}) {
 		return fmt.Errorf("failed to create an image: ID must be provided")
 	}
@@ -88,7 +91,7 @@ func (s *ImageStore) Create(v *ImageAction) error {
 	return s.dump()
 }
 
-func (s *ImageStore) Update(updatedImage *ImageAction) error {
+func (s *ImageStore) Update(updatedImage *instructions.ImageAction) error {
 	s.mu.Lock()
 	for _, s := range s.Images {
 		if s.ID == updatedImage.ID {
@@ -111,7 +114,7 @@ func (s *ImageStore) Delete(id string) error {
 		return err
 	}
 
-	newItems := []*ImageAction{}
+	newItems := []*instructions.ImageAction{}
 
 	for _, s := range s.Images {
 		if s.ID == uid {

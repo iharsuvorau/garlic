@@ -15,6 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+
+	"github.com/iharsuvorau/garlic/instructions"
 )
 
 // TODO: communicate over WSS
@@ -230,7 +232,7 @@ func sendCommandHandler(c *gin.Context) {
 	// In the first case, we just respond with OK status and the web browser will play an audio file for the instruction.
 	// If something is wrong, we reply with error and the sound won't be played.
 	// In the second and third cases, we push the command to a web socket for Pepper to execute.
-	var action Instruction
+	var action instructions.Instruction
 	action = sessionsStore.GetAction(form.ItemID)
 	if action.IsNil() {
 		action, _ = moveStore.GetByUUID(form.ItemID)
@@ -252,7 +254,7 @@ func sendCommandHandler(c *gin.Context) {
 		})
 		return
 	}
-	if err = sendInstruction(action, wsConnection); err != nil {
+	if err = instructions.SendInstruction(action, wsConnection, &wsMu); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -443,7 +445,7 @@ func createAudioJSONHandler(c *gin.Context) {
 	if group == "" {
 		group = "Default"
 	}
-	action := &SayAction{
+	action := &instructions.SayAction{
 		ID:       uid,
 		Phrase:   phrase,
 		FilePath: dst,
@@ -490,7 +492,7 @@ func moveUploadJSONHandler(c *gin.Context) {
 	if moveGroup == "" {
 		moveGroup = "Default"
 	}
-	move := &MoveAction{
+	move := &instructions.MoveAction{
 		ID:       uid,
 		Name:     moveName,
 		FilePath: dst,
@@ -664,7 +666,7 @@ func actionsJSONHandler(c *gin.Context) {
 }
 
 func createActionJSONHandler(c *gin.Context) {
-	newAction := new(Action)
+	newAction := new(instructions.Action)
 
 	err := c.ShouldBindJSON(&newAction)
 	if err != nil {
@@ -746,10 +748,10 @@ func getServerIPJSONHandler(c *gin.Context) {
 
 // Helpers
 
-func makeMoveActionsFromNames(names []string, group string) []*MoveAction {
-	moves := []*MoveAction{}
+func makeMoveActionsFromNames(names []string, group string) []*instructions.MoveAction {
+	moves := []*instructions.MoveAction{}
 	for _, n := range names {
-		moves = append(moves, &MoveAction{
+		moves = append(moves, &instructions.MoveAction{
 			ID:       uuid.Must(uuid.NewRandom()),
 			Name:     n,
 			FilePath: "",

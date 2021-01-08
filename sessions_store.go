@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+
+	"github.com/iharsuvorau/garlic/instructions"
 )
 
 // Session represents a session with a child, a set of questions and simple answers which
@@ -68,7 +70,7 @@ func (s *Session) initializeIDs() {
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
 	ID      uuid.UUID
-	Actions []*Action // the first item of Actions is the main item, usually, it's the main question
+	Actions []*instructions.Action // the first item of Actions is the main item, usually, it's the main question
 	// of the session item, other actions are some kind of conversation supportive answers
 }
 
@@ -102,7 +104,7 @@ func NewSessionStore(fpath string) (*SessionStore, error) {
 		for _, item := range s.Items {
 			for _, action := range item.Actions {
 				if action.ImageItem == nil {
-					action.ImageItem = &ImageAction{}
+					action.ImageItem = &instructions.ImageAction{}
 				}
 			}
 		}
@@ -118,7 +120,7 @@ func NewSessionStore(fpath string) (*SessionStore, error) {
 
 // GetAction looks for a top level instruction, which unites Say and Move actions
 // and presents them as a union of two actions, so both actions should be executed.
-func (s *SessionStore) GetAction(id uuid.UUID) *Action {
+func (s *SessionStore) GetAction(id uuid.UUID) *instructions.Action {
 	for _, session := range s.Sessions {
 		for _, item := range session.Items {
 			for _, action := range item.Actions {
@@ -299,7 +301,7 @@ func (s *SessionStore) DeleteInstruction(id string) error {
 		for _, item := range session.Items {
 			for _, instruction := range item.Actions {
 				if instruction.ID == uid {
-					newActions := []*Action{}
+					newActions := []*instructions.Action{}
 					for _, action := range item.Actions {
 						if action.ID == uid {
 							continue
