@@ -18,7 +18,7 @@ type ShowImage struct {
 }
 
 func (item *ShowImage) Command() Command {
-	return ShowURLCommand
+	return ShowImageCommand
 }
 
 func (item *ShowImage) Content() (b []byte, err error) {
