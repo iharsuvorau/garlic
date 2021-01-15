@@ -240,7 +240,7 @@ func sendCommandHandler(c *gin.Context) {
 	}
 	if !action.IsValid() || action.IsNil() {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":  "got an invalid instruction",
+			"error":  "got an invalid or empty instruction",
 			"method": "sendCommandHandler",
 		})
 		return

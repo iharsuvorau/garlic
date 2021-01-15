@@ -3,6 +3,7 @@ package instruction
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/google/uuid"
@@ -52,9 +53,11 @@ func (item *Move) IsValid() bool {
 
 	// if non-nil, check other fields
 	if _, err := uuid.Parse(item.ID.String()); err != nil {
+		log.Println("move UUID parsing failed")
 		return false
 	}
-	if len(item.Name) == 0 || len(item.FilePath) == 0 {
+	if len(item.Name) == 0 && len(item.FilePath) == 0 {
+		log.Println("move's Name or FilePath are empty")
 		return false
 	}
 	return true
