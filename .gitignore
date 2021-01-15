@@ -1,5 +1,6 @@
 cert-gen
 data
+data_*
 build
 server.crt
 server.key
