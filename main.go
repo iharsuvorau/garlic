@@ -50,6 +50,7 @@ var (
 var (
 	servingAddr = flag.String("addr", "0.0.0.0:8080", "http service address")
 	motionsDir  = flag.String("moves", "data/pepper-core-anims-master", "path to the folder with moves")
+	// TODO: data dir flag instead of motionsDir
 )
 
 func main() {
