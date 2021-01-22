@@ -1,5 +1,5 @@
 WIN64_DIR := build/windows_amd64
-OSX_DIR := build/darwing_amd64
+OSX_DIR := build/darwin_amd64
 BIN_NAME := garlic
 
 windows:
