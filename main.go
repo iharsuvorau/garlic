@@ -233,6 +233,9 @@ func sendCommandHandler(c *gin.Context) {
 		action, _ = actionsStore.GetByUUID(form.ItemID)
 	}
 	if action.IsNil() {
+		action, _ = audioStore.GetByUUID(form.ItemID)
+	}
+	if action.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":  fmt.Sprintf("can't find the instruction with the ID %s", form.ItemID),
 			"method": "sendCommandHandler",
