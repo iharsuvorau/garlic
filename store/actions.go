@@ -41,6 +41,10 @@ func NewActionsStore(fpath string) (*Actions, error) {
 		return nil, fmt.Errorf("can't decode audio items from %s: %v", fpath, err)
 	}
 
+	for _, a := range store.Items {
+		a.InitiateItemsIDs()
+	}
+
 	return store, store.dump()
 }
 
@@ -77,6 +81,9 @@ func (s *Actions) Create(a *instruction.Action) error {
 	if a.IsNil() {
 		return fmt.Errorf("action is nil")
 	}
+
+	a.InitiateItemsIDs()
+
 	s.mu.Lock()
 	s.Items = append(s.Items, a)
 	s.mu.Unlock()
