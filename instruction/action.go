@@ -212,3 +212,21 @@ func (a *Action) IsNil() bool {
 func (a *Action) GetName() string {
 	return a.MoveItem.Name
 }
+
+func (a *Action) InitiateItemsIDs() {
+	if a == nil {
+		return
+	}
+	if a.SayItem != nil && (a.SayItem.ID == uuid.UUID{}) {
+		a.SayItem.ID = uuid.Must(uuid.NewRandom())
+	}
+	if a.MoveItem != nil && (a.MoveItem.ID == uuid.UUID{}) {
+		a.MoveItem.ID = uuid.Must(uuid.NewRandom())
+	}
+	if a.ImageItem != nil && (a.ImageItem.ID == uuid.UUID{}) {
+		a.ImageItem.ID = uuid.Must(uuid.NewRandom())
+	}
+	if a.URLItem != nil && (a.URLItem.ID == uuid.UUID{}) {
+		a.URLItem.ID = uuid.Must(uuid.NewRandom())
+	}
+}
