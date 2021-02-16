@@ -26,6 +26,7 @@ import (
 // TODO: make abstraction separation clearer between Session and Images, Audio and Files
 // TODO: make so that SayItem is not compulsory, any Action could be there
 // NOTE: another approach to files: don't send them with each request, but serve as static files and send only URL
+// TODO: check for duplicated IDs for any item on create step, creating a store
 
 // App-wide variables
 var (
@@ -93,7 +94,7 @@ func newEngine() *gin.Engine {
 	// main router
 	r := gin.New()
 	// middleware
-	r.Use(allowCORS)
+	r.Use(allowCORS, logRequest)
 	// static assets
 	r.Static("/data", "data")
 
@@ -170,6 +171,10 @@ func allowCORS(c *gin.Context) {
 	c.Writer.Header().Add("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Add("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
 	c.Writer.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+}
+
+func logRequest(c *gin.Context) {
+	log.Printf("%s %s %s", c.Request.Method, c.Request.RequestURI, c.Request.RemoteAddr)
 }
 
 // Handlers
