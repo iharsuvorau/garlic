@@ -230,3 +230,22 @@ func (a *Action) InitiateItemsIDs() {
 		a.URLItem.ID = uuid.Must(uuid.NewRandom())
 	}
 }
+
+func (a *Action) LocateAssets() []string {
+	if a == nil {
+		return nil
+	}
+
+	paths := []string{}
+	if a.SayItem != nil && a.SayItem.FilePath != "" {
+		paths = append(paths, a.SayItem.FilePath)
+	}
+	if a.ImageItem != nil && a.ImageItem.FilePath != "" {
+		paths = append(paths, a.ImageItem.FilePath)
+	}
+	if a.MoveItem != nil && a.MoveItem.FilePath != "" {
+		paths = append(paths, a.MoveItem.FilePath)
+	}
+
+	return paths
+}

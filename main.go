@@ -107,6 +107,8 @@ func newEngine() *gin.Engine {
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
 	r.OPTIONS("/api/sessions/", emptyResponseOK)
+	r.GET("/api/sessions/:id/export", exportSessionJSONHandler)
+	r.OPTIONS("/api/sessions/:id/export", emptyResponseOK)
 	r.GET("/api/sessions/:id", getSessionJSONHandler)
 	r.PUT("/api/sessions/:id", updateSessionJSONHandler)
 	r.DELETE("/api/sessions/:id", deleteSessionJSONHandler)
@@ -338,6 +340,32 @@ func getSessionJSONHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": session,
+	})
+}
+
+func exportSessionJSONHandler(c *gin.Context) {
+	id := c.Param("id")
+	session, err := sessionsStore.Get(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err = session.Export(".")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		log.Println(err)
+		return
+	}
+	// TODO: send archive to the client
+	// TODO: remove archive after it's downloaded
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "session has been exported",
 	})
 }
 

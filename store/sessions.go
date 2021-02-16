@@ -1,11 +1,16 @@
 package store
 
 import (
+	"archive/zip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
+	"path"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -66,12 +71,106 @@ func (s *Session) initializeIDs() {
 	}
 }
 
+func (s *Session) Export(dir string) error {
+	archiveFiles := []string{}
+
+	// create subdirectory
+	subDirName := path.Join(dir, s.ID.String())
+	uploadsName := path.Join(subDirName, "uploads")
+	err := os.MkdirAll(uploadsName, 0777)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := os.RemoveAll(subDirName)
+		if err != nil {
+			log.Println("failed to remove sub directory after exporting the session", s.ID, err)
+		}
+	}() // cleaning up
+
+	// export JSON data of the session
+	const sessionFileName = "session.json"
+	name := path.Join(subDirName, sessionFileName)
+	f, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	if err = json.NewEncoder(f).Encode(s); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		log.Println("session export error on session.json close:", err)
+	}
+	archiveFiles = append(archiveFiles, name) // keeping track of archive files
+
+	// export user data assets: uploads (images, sounds, moves)
+	userAssets := []string{}
+	for _, item := range s.Items {
+		for _, assetPath := range item.LocateAssets() {
+			if strings.HasPrefix(assetPath, "data/uploads") {
+				userAssets = append(userAssets, assetPath)
+			}
+		}
+	}
+
+	// collect assets
+	for _, asset := range userAssets {
+		newAsset := strings.Replace(asset, "data", subDirName, 1)
+		if err = copyFile(asset, newAsset); err != nil {
+			return err
+		}
+		archiveFiles = append(archiveFiles, newAsset) // keeping track of archive files
+	}
+
+	// archive files
+	f, err = os.Create(subDirName + ".zip")
+	if err != nil {
+		return err
+	}
+	w := zip.NewWriter(f)
+	for _, asset := range archiveFiles {
+		// expected path transformation: <subDirName>/uploads/<file-UUID>.qianim -> uploads/UUID.qianim
+		assetInArchivePath := strings.Replace(asset, subDirName+"/", "", 1)
+		wf, err := w.Create(assetInArchivePath)
+		if err != nil {
+			return err
+		}
+		b, err := ioutil.ReadFile(asset)
+		if err != nil {
+			return err
+		}
+		if _, err = wf.Write(b); err != nil {
+			return err
+		}
+	}
+	if err = w.Close(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
+		log.Println("session export error on archive file close:", err)
+	}
+
+	return nil
+}
+
+func (s *Session) Import(fpath string) error {
+	return errors.New("not implemented")
+}
+
 // SessionItem represents a single unit of a session, it's a question and positive and negative
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
 	ID      uuid.UUID
 	Actions []*instruction.Action // the first item of Actions is the main item, usually, it's the main question
 	// of the session item, other actions are some kind of conversation supportive answers
+}
+
+func (si *SessionItem) LocateAssets() []string {
+	paths := []string{}
+	for _, action := range si.Actions {
+		paths = append(paths, action.LocateAssets()...)
+	}
+	return paths
 }
 
 type Sessions struct {
@@ -343,4 +442,24 @@ func removeFile(filePath string) error {
 		}
 	}
 	return err
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }
