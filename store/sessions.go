@@ -157,10 +157,6 @@ func (s *Session) Export(dir string) (archivePath string, err error) {
 	return
 }
 
-func (s *Session) Import(fpath string) error {
-	return errors.New("not implemented")
-}
-
 // SessionItem represents a single unit of a session, it's a question and positive and negative
 // answers accompanied with a robot's moves which are represented in the web UI as a set of buttons.
 type SessionItem struct {
@@ -421,6 +417,10 @@ func (s *Sessions) DeleteInstruction(id string) error {
 	}
 
 	return s.dump()
+}
+
+func (s *Sessions) Import(fpath string) error {
+	return errors.New("not implemented")
 }
 
 func (s *Sessions) dump() error {
