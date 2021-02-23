@@ -71,15 +71,15 @@ func (s *Session) initializeIDs() {
 	}
 }
 
-func (s *Session) Export(dir string) error {
+func (s *Session) Export(dir string) (archivePath string, err error) {
 	archiveFiles := []string{}
 
 	// create subdirectory
 	subDirName := path.Join(dir, s.ID.String())
 	uploadsName := path.Join(subDirName, "uploads")
-	err := os.MkdirAll(uploadsName, 0777)
+	err = os.MkdirAll(uploadsName, 0777)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
 		err := os.RemoveAll(subDirName)
@@ -93,10 +93,10 @@ func (s *Session) Export(dir string) error {
 	name := path.Join(subDirName, sessionFileName)
 	f, err := os.Create(name)
 	if err != nil {
-		return err
+		return
 	}
 	if err = json.NewEncoder(f).Encode(s); err != nil {
-		return err
+		return
 	}
 	if err := f.Close(); err != nil {
 		log.Println("session export error on session.json close:", err)
@@ -117,40 +117,44 @@ func (s *Session) Export(dir string) error {
 	for _, asset := range userAssets {
 		newAsset := strings.Replace(asset, "data", subDirName, 1)
 		if err = copyFile(asset, newAsset); err != nil {
-			return err
+			return
 		}
 		archiveFiles = append(archiveFiles, newAsset) // keeping track of archive files
 	}
 
 	// archive files
-	f, err = os.Create(subDirName + ".zip")
+	archivePath = subDirName + ".zip"
+	f, err = os.Create(archivePath)
 	if err != nil {
-		return err
+		return
 	}
 	w := zip.NewWriter(f)
 	for _, asset := range archiveFiles {
 		// expected path transformation: <subDirName>/uploads/<file-UUID>.qianim -> uploads/UUID.qianim
 		assetInArchivePath := strings.Replace(asset, subDirName+"/", "", 1)
-		wf, err := w.Create(assetInArchivePath)
+		var wf io.Writer
+		wf, err = w.Create(assetInArchivePath)
 		if err != nil {
-			return err
+			return
 		}
-		b, err := ioutil.ReadFile(asset)
+
+		var b []byte
+		b, err = ioutil.ReadFile(asset)
 		if err != nil {
-			return err
+			return
 		}
+
 		if _, err = wf.Write(b); err != nil {
-			return err
+			return
 		}
 	}
 	if err = w.Close(); err != nil {
-		return err
+		return
 	}
 	if err = f.Close(); err != nil {
 		log.Println("session export error on archive file close:", err)
 	}
-
-	return nil
+	return
 }
 
 func (s *Session) Import(fpath string) error {
