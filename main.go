@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -97,6 +99,7 @@ func newEngine() *gin.Engine {
 	r.Use(allowCORS, logRequest)
 	// static assets
 	r.Static("/data", "data")
+	r.GET("/tmp/:name", serveCleanlyHandler)
 
 	// pepper communication
 	r.GET("/api/pepper/initiate", initiateHandler)
@@ -154,8 +157,6 @@ func newEngine() *gin.Engine {
 	r.OPTIONS("/api/actions/:id", emptyResponseOK)
 
 	// utilities: helpful endpoints for the client application or other
-	r.GET("/api/data/export", exportDataJSONHandler)
-	r.OPTIONS("/api/data/export", emptyResponseOK)
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	r.GET("/api/server_ip", getServerIPJSONHandler)
 
@@ -358,7 +359,7 @@ func exportSessionJSONHandler(c *gin.Context) {
 		return
 	}
 
-	err = session.Export(".")
+	relativePath, err := session.Export("tmp")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -366,11 +367,10 @@ func exportSessionJSONHandler(c *gin.Context) {
 		log.Println(err)
 		return
 	}
-	// TODO: send archive to the client
-	// TODO: remove archive after it's downloaded
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "session has been exported",
+		"message":       "session has been exported",
+		"relative_path": relativePath,
 	})
 }
 
@@ -746,25 +746,6 @@ func getSessionItemJSONHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": item})
 }
 
-func exportDataJSONHandler(c *gin.Context) {
-	// TODO: create tmp "data" directory with databases, uploaded files and built-in files
-	//fileStore.base
-	//
-	//sessionsStore.filepath
-	//moveStore.filepath
-	//audioStore.filepath
-
-	// TODO: archive and send in the request
-
-	// TODO: clean up
-}
-
-func importDataJSONHandler(c *gin.Context) {
-	// TODO: read the "data" directory
-	// TODO: extract databases, uploads and built-in files
-	// TODO: remove existing data directory and put new files inside, reload the server to read updated databases or just recreate store objects
-}
-
 func getServerIPJSONHandler(c *gin.Context) {
 	ip, err := getOutboundIP()
 	if err != nil {
@@ -772,6 +753,18 @@ func getServerIPJSONHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": ip})
+}
+
+func serveCleanlyHandler(c *gin.Context) {
+	name := c.Param("name")
+	fpath := path.Join("tmp", name)
+	c.File(fpath)
+	defer func() {
+		err := os.RemoveAll("tmp")
+		if err != nil {
+			log.Printf("failed to remove ./tmp: %v", err)
+		}
+	}()
 }
 
 // Helpers
