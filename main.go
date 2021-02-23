@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -111,6 +112,8 @@ func newEngine() *gin.Engine {
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
 	r.OPTIONS("/api/sessions/", emptyResponseOK)
+	r.POST("/api/sessions/import", importSessionHandler)
+	r.OPTIONS("/api/sessions/import", emptyResponseOK)
 	r.GET("/api/sessions/:id/export", exportSessionJSONHandler)
 	r.OPTIONS("/api/sessions/:id/export", emptyResponseOK)
 	r.GET("/api/sessions/:id", getSessionJSONHandler)
@@ -346,6 +349,53 @@ func getSessionJSONHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": session,
+	})
+}
+
+func importSessionHandler(c *gin.Context) {
+	inFile, fh, err := c.Request.FormFile("file_content")
+	if err != nil {
+		log.Printf("importSessionHandler: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer inFile.Close()
+
+	// uploading archive to ./tmp
+	dst := path.Join("tmp", fh.Filename)
+	err = os.MkdirAll("tmp", 0777)
+	if err != nil {
+		log.Printf("importSessionHandler: failed to create ./tmp: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	outFile, err := os.Create(dst)
+	if err != nil {
+		log.Printf("importSessionHandler: failed to create file at %v: %v", dst, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer outFile.Close()
+	if _, err = io.Copy(outFile, inFile); err != nil {
+		log.Printf("importSessionHandler: failed to copy uploaded file: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// initiating an import
+	if err = sessionsStore.Import(dst); err != nil {
+		log.Printf("importSessionHandler: failed to import the session at %s: %v", dst, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// cleaning up
+	if err = os.RemoveAll("tmp"); err != nil {
+		log.Printf("importSessionHandler: failed to clean up after importing: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "session has been uploaded successfully",
 	})
 }
 
