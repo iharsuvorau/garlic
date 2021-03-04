@@ -112,10 +112,6 @@ func newEngine() *gin.Engine {
 	r.GET("/api/sessions/", sessionsJSONHandler)
 	r.POST("/api/sessions/", createSessionJSONHandler)
 	r.OPTIONS("/api/sessions/", emptyResponseOK)
-	r.POST("/api/sessions/import", importSessionHandler)
-	r.OPTIONS("/api/sessions/import", emptyResponseOK)
-	r.GET("/api/sessions/:id/export", exportSessionJSONHandler)
-	r.OPTIONS("/api/sessions/:id/export", emptyResponseOK)
 	r.GET("/api/sessions/:id", getSessionJSONHandler)
 	r.PUT("/api/sessions/:id", updateSessionJSONHandler)
 	r.DELETE("/api/sessions/:id", deleteSessionJSONHandler)
@@ -357,6 +353,11 @@ func getSessionJSONHandler(c *gin.Context) {
 }
 
 func importSessionHandler(c *gin.Context) {
+	var overwrite bool
+	if s := c.Request.FormValue("overwrite"); s == "true" {
+		overwrite = true
+	}
+
 	inFile, fh, err := c.Request.FormFile("file_content")
 	if err != nil {
 		log.Printf("importSessionHandler: %v", err)
@@ -373,6 +374,11 @@ func importSessionHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	defer func() {
+		if err = os.RemoveAll("tmp"); err != nil {
+			log.Printf("importSessionHandler: failed to clean up after importing: %v", err)
+		}
+	}() // cleaning up at the end
 	outFile, err := os.Create(dst)
 	if err != nil {
 		log.Printf("importSessionHandler: failed to create file at %v: %v", dst, err)
@@ -387,15 +393,10 @@ func importSessionHandler(c *gin.Context) {
 	}
 
 	// initiating an import
-	if err = sessionsStore.Import(dst); err != nil {
+	if err = sessionsStore.Import(dst, overwrite, fileStore); err != nil {
 		log.Printf("importSessionHandler: failed to import the session at %s: %v", dst, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-
-	// cleaning up
-	if err = os.RemoveAll("tmp"); err != nil {
-		log.Printf("importSessionHandler: failed to clean up after importing: %v", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
