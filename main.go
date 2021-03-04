@@ -122,6 +122,10 @@ func newEngine() *gin.Engine {
 	r.OPTIONS("/api/sessions/:id", emptyResponseOK)
 	r.GET("/api/session_items/:id", getSessionItemJSONHandler)
 	r.OPTIONS("/api/session_items/:id", emptyResponseOK)
+	r.GET("/api/session_export/:id", exportSessionJSONHandler)
+	r.OPTIONS("/api/session_export/:id", emptyResponseOK)
+	r.POST("/api/session_import", importSessionHandler)
+	r.OPTIONS("/api/session_import", emptyResponseOK)
 
 	// ?
 	r.GET("/api/instruction/:id", getInstructionJSONHandler)
