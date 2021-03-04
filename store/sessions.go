@@ -3,7 +3,6 @@ package store
 import (
 	"archive/zip"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -310,6 +309,9 @@ func (s *Sessions) GetItem(id string) (*SessionItem, error) {
 
 func (s *Sessions) Create(newSession *Session) error {
 	newSession.initializeIDs()
+	if s.isDuplicate(newSession) {
+		return fmt.Errorf("cannot create a new session, duplicated ID: %v", newSession.ID)
+	}
 	s.mu.Lock()
 	s.Sessions = append(s.Sessions, newSession)
 	s.mu.Unlock()
@@ -419,8 +421,60 @@ func (s *Sessions) DeleteInstruction(id string) error {
 	return s.dump()
 }
 
-func (s *Sessions) Import(fpath string) error {
-	return errors.New("not implemented")
+func (s *Sessions) Import(fpath string, overwrite bool, fileStore *Files) error {
+	r, err := zip.OpenReader(fpath)
+	if err != nil {
+		return fmt.Errorf("failed to open a reader for %s: %v", fpath, err)
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		// creating a new or updating an existing session
+		if f.Name == "session.json" {
+			ff, err := f.Open()
+			if err != nil {
+				return fmt.Errorf("failed to open %s at %s: %v", f.Name, fpath, err)
+			}
+
+			var session Session
+			if err = json.NewDecoder(ff).Decode(&session); err != nil {
+				return fmt.Errorf("failed to decode %s at %s: %v", f.Name, fpath, err)
+			}
+			err = ff.Close()
+			if err != nil {
+				return fmt.Errorf("failed to close %s at %s: %v", f.Name, fpath, err)
+			}
+
+			if overwrite && s.isDuplicate(&session) {
+				err = s.Update(&session)
+			} else {
+				err = s.Create(&session)
+			}
+			if err != nil {
+				return err
+			}
+		}
+
+		// checking and uploading attached files
+		if strings.HasPrefix(f.Name, " uploads/") {
+			name := path.Base(f.Name)
+			ff, err := f.Open()
+			if err != nil {
+				return fmt.Errorf("failed to open %s at %s: %v", f.Name, fpath, err)
+			}
+
+			if _, err = fileStore.Save(name, ff); err != nil {
+				return fmt.Errorf("failed to save a file at %s: %v", name, err)
+			}
+
+			err = ff.Close()
+			if err != nil {
+				return fmt.Errorf("failed to close %s at %s: %v", f.Name, fpath, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *Sessions) dump() error {
@@ -433,6 +487,15 @@ func (s *Sessions) dump() error {
 	}
 	defer f.Close()
 	return json.NewEncoder(f).Encode(s.Sessions)
+}
+
+func (s *Sessions) isDuplicate(ss *Session) bool {
+	for _, v := range s.Sessions {
+		if v.ID == ss.ID {
+			return true
+		}
+	}
+	return false
 }
 
 func removeFile(filePath string) error {
