@@ -74,7 +74,7 @@ func (s *Session) Export(dir string) (archivePath string, err error) {
 	archiveFiles := []string{}
 
 	// create subdirectory
-	subDirName := path.Join(dir, s.ID.String())
+	subDirName := path.Join(dir, s.Name)
 	uploadsName := path.Join(subDirName, "uploads")
 	err = os.MkdirAll(uploadsName, 0777)
 	if err != nil {
