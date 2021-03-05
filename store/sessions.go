@@ -456,7 +456,7 @@ func (s *Sessions) Import(fpath string, overwrite bool, fileStore *Files) error 
 		}
 
 		// checking and uploading attached files
-		if strings.HasPrefix(f.Name, " uploads/") {
+		if strings.HasPrefix(f.Name, "uploads/") {
 			name := path.Base(f.Name)
 			ff, err := f.Open()
 			if err != nil {
