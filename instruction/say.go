@@ -55,5 +55,5 @@ func (item *Say) IsNil() bool {
 }
 
 func (item *Say) GetName() string {
-	return ""
+	return fmt.Sprintf("Say: %s", item.Phrase)
 }
