@@ -81,112 +81,155 @@ func (pm PepperMessage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v)
 }
 
+func (pm PepperMessage) SendWS(connection *websocket.Conn, mu *sync.Mutex) error {
+	b, err := json.Marshal(pm)
+	if err != nil {
+		return fmt.Errorf("can't marshal PepperMessage: %v", err)
+	}
+	mu.Lock()
+	defer func() {
+		mu.Unlock()
+	}()
+	return connection.WriteMessage(websocket.TextMessage, b)
+}
+
 // SendInstruction sends an instruction to a robot via a web socket.
-func SendInstruction(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) error {
+func SendInstruction(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) (err error) {
 	if connection == nil {
 		return fmt.Errorf("websocket connection is nil, Pepper must initiate it first")
 	}
 
-	send := func(p PepperMessage, connection *websocket.Conn) error {
-		b, err := json.Marshal(p)
-		if err != nil {
-			return fmt.Errorf("can't marshal PepperMessage: %v", err)
-		}
-		mu.Lock()
-		defer func() {
-			mu.Unlock()
-		}()
-		return connection.WriteMessage(websocket.TextMessage, b)
+	switch instr.Command() {
+	case ActionCommand:
+		err = handleAction(instr, connection, mu)
+	case SayCommand:
+		err = handleSay(instr, connection, mu)
+	default:
+		err = handleAny(instr, connection, mu)
 	}
 
-	if instr.Command() == ActionCommand { // unpacking the wrapper and sending three actions sequentially
-		// NOTE: actually, we send only a motion and image now, because audio is played via a speaker from a local computer
-		action := instr.(*Action)
+	return err
+}
 
-		// first, trying to get the content of a file
-		if action.MoveItem != nil {
-			content, err := action.MoveItem.Content()
-			if err != nil && action.MoveItem.Name == "" {
-				// second, checking on the name presence and sending just a name,
-				// the move should be located on the Android app's side then
-				log.Printf("no motion content: %v", err)
-				err = nil // TODO: empty MoveItem shouldn't be created in the first place, need to change the frontend behaviour
-			} else {
-				err = nil
-			}
+func handleAction(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) error {
+	// unpacking the wrapper and sending three actions sequentially
+	// NOTE: actually, we send only a motion and image now, because audio is played via a speaker from a local computer
+	action := instr.(*Action)
 
-			if len(content) > 0 || action.MoveItem.Name != "" {
-				move := PepperMessage{
-					Command: action.MoveItem.Command(),
-					Name:    action.MoveItem.Name,
-					Content: base64.StdEncoding.EncodeToString(content),
-					Delay:   action.MoveItem.DelayMillis(),
-				}
+	// NOTE: order of processing matters: image with URL go last
 
-				if err := send(move, connection); err != nil {
-					return err
-				}
-			}
+	// getting the phrase content--must come before image processing, otherwise a phony phrase can disrupt
+	// image showing on a robot, because the image is cancelled when any other command is sent
+	if action.SayItem != nil {
+		phrase := PepperMessage{
+			Command: action.SayItem.Command(),
+			// NOTE: we send a phony string, because the phrase is being played in the client JS app currently
+			Content: base64.StdEncoding.EncodeToString([]byte("")),
+			Name:    action.SayItem.GetName(),
+			Delay:   action.SayItem.DelayMillis(),
 		}
 
-		// second, trying to get an image
-		if action.ImageItem != nil {
-			content, err := action.ImageItem.Content()
-			if err != nil {
-				log.Println("no image content")
-				err = nil
-			} else {
-				image := PepperMessage{
-					Command: action.ImageItem.Command(),
-					Content: base64.StdEncoding.EncodeToString(content),
-					Name:    action.ImageItem.Name,
-					Delay:   action.ImageItem.DelayMillis(),
-				}
-
-				if err := send(image, connection); err != nil {
-					return err
-				}
-			}
+		if err := phrase.SendWS(connection, mu); err != nil {
+			return err
 		}
+	}
 
-		// third, trying to get an URL
-		if action.URLItem != nil {
-			content, err := action.URLItem.Content()
-			if err != nil {
-				log.Println("no URL content")
-				err = nil
-			} else {
-				webURL := PepperMessage{
-					Command: action.URLItem.Command(),
-					Content: base64.StdEncoding.EncodeToString(content),
-					Name:    action.URLItem.Name,
-					Delay:   action.URLItem.DelayMillis(),
-				}
-
-				log.Printf("sending url: %+v", webURL)
-				if err := send(webURL, connection); err != nil {
-					return err
-				}
-			}
-		}
-	} else { // just sending the instr
-		// TODO: this is never called probably
-		name := instr.GetName()
-		content, err := instr.Content()
-		if err != nil && name == "" {
-			return fmt.Errorf("can't get content out of MoveItem and Name is missing: %v", err)
+	// trying to get the content of a file
+	if action.MoveItem != nil {
+		content, err := action.MoveItem.Content()
+		if err != nil && action.MoveItem.Name == "" {
+			// second, checking on the name presence and sending just a name,
+			// the move should be located on the Android app's side then
+			log.Printf("no motion content: %v", err)
+			err = nil // TODO: empty MoveItem shouldn't be created in the first place, need to change the frontend behaviour
 		} else {
 			err = nil
 		}
 
-		move := PepperMessage{
-			Command: instr.Command(),
-			Name:    name,
-			Content: base64.StdEncoding.EncodeToString(content),
-			Delay:   instr.DelayMillis(),
+		if len(content) > 0 || action.MoveItem.Name != "" {
+			move := PepperMessage{
+				Command: action.MoveItem.Command(),
+				Name:    action.MoveItem.Name,
+				Content: base64.StdEncoding.EncodeToString(content),
+				Delay:   action.MoveItem.DelayMillis(),
+			}
+
+			if err := move.SendWS(connection, mu); err != nil {
+				return err
+			}
 		}
-		return send(move, connection)
+	}
+
+	// trying to get an image
+	if action.ImageItem != nil {
+		content, err := action.ImageItem.Content()
+		if err != nil {
+			log.Println("no image content")
+			err = nil
+		} else {
+			image := PepperMessage{
+				Command: action.ImageItem.Command(),
+				Content: base64.StdEncoding.EncodeToString(content),
+				Name:    action.ImageItem.Name,
+				Delay:   action.ImageItem.DelayMillis(),
+			}
+
+			if err := image.SendWS(connection, mu); err != nil {
+				return err
+			}
+		}
+	}
+
+	// trying to get an URL
+	if action.URLItem != nil {
+		content, err := action.URLItem.Content()
+		if err != nil {
+			log.Println("no URL content")
+			err = nil
+		} else {
+			webURL := PepperMessage{
+				Command: action.URLItem.Command(),
+				Content: base64.StdEncoding.EncodeToString(content),
+				Name:    action.URLItem.Name,
+				Delay:   action.URLItem.DelayMillis(),
+			}
+
+			if err := webURL.SendWS(connection, mu); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
+}
+
+func handleSay(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) error {
+	msg := PepperMessage{
+		Command: instr.Command(),
+		Name:    instr.GetName(),
+		// NOTE: we send a phony string, because the phrase is being played in the client JS app currently
+		Content: base64.StdEncoding.EncodeToString([]byte("")),
+		Delay:   instr.DelayMillis(),
+	}
+
+	return msg.SendWS(connection, mu)
+}
+
+func handleAny(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) error {
+	name := instr.GetName()
+	content, err := instr.Content()
+	if err != nil && name == "" {
+		return fmt.Errorf("can't get content out of an instruction and Name is missing, which makes the instruction ambiguous: %v", err)
+	} else {
+		err = nil
+	}
+
+	msg := PepperMessage{
+		Command: instr.Command(),
+		Name:    name,
+		Content: base64.StdEncoding.EncodeToString(content),
+		Delay:   instr.DelayMillis(),
+	}
+
+	return msg.SendWS(connection, mu)
 }
