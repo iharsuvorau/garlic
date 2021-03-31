@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -162,6 +164,10 @@ func newEngine() *gin.Engine {
 	// utilities: helpful endpoints for the client application or other
 	r.GET("/api/move_groups/", moveGroupsJSONHandler)
 	r.GET("/api/server_ip", getServerIPJSONHandler)
+
+	// speech synthesizer proxy to avoid CORS problem
+	r.POST("/api/synthesize", speechSynthJSONHandler)
+	r.OPTIONS("/api/synthesize", emptyResponseOK)
 
 	// main fallback: nothing to serve here at the moment, but could be a place for API documentation
 	r.GET("/", emptyResponseOK)
@@ -820,6 +826,85 @@ func serveCleanlyHandler(c *gin.Context) {
 			log.Printf("failed to remove ./tmp: %v", err)
 		}
 	}()
+}
+
+func speechSynthJSONHandler(c *gin.Context) {
+	// parsing a request from garlic-client
+
+	var payload = struct {
+		Text    string
+		Voice   uint8
+		Emotion uint8
+	}{}
+
+	err := json.NewDecoder(c.Request.Body).Decode(&payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer c.Request.Body.Close()
+
+	// EKI API request
+
+	data := url.Values{}
+	data.Set("speech", payload.Text)
+	data.Set("v", fmt.Sprintf("%v", payload.Voice))
+	data.Set("e", fmt.Sprintf("%v", payload.Emotion))
+	dataString := data.Encode()
+	log.Printf("data: %s", dataString)
+
+	// querying EKI API
+
+	req, err := http.NewRequest("POST", "https://www.eki.ee/heli/kiisu/syntproxy.php", strings.NewReader(dataString))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var response = struct {
+		MP3 string `json:"mp3"`
+		WAV string `json:"wav"`
+	}{}
+
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	defer resp.Body.Close()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// appending the host to response values
+
+	u, err := url.Parse("https://www.eki.ee" + response.MP3)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	response.MP3 = u.String()
+
+	u, err = url.Parse("https://www.eki.ee" + response.WAV)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	response.WAV = u.String()
+
+	// returning
+
+	fmt.Printf("response: %v\n", response)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "speech synthesis has completed successfully",
+		"mp3":     response.MP3,
+		"wav":     response.WAV,
+	})
 }
 
 // Helpers
