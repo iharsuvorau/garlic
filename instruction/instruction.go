@@ -95,7 +95,21 @@ func (pm PepperMessage) SendWS(connection *websocket.Conn, mu *sync.Mutex) error
 
 // SendInstruction sends an instruction to a robot via a web socket.
 func SendInstruction(instr Instruction, connection *websocket.Conn, mu *sync.Mutex) (err error) {
+	if len(instr.(*Action).SayItem.FilePath) > 0 {
+		go soundPlayer(instr.(*Action).SayItem.FilePath)
+	}
 	if connection == nil {
+		action := instr.(*Action)
+
+		log.Printf("File path: %v", action.SayItem.FilePath)
+		log.Printf("Delay s: %v", action.SayItem.DelayMillis())
+		log.Printf("Command: %v", action.SayItem.Command())
+		log.Printf("Content: %v", base64.StdEncoding.EncodeToString([]byte("")))
+		log.Printf("Name: %v", action.SayItem.GetName())
+
+		// NOTE: we send a phony string, because the phrase is being played in the client JS app currently
+
+		log.Println("no connection")
 		return fmt.Errorf("websocket connection is nil, Pepper must initiate it first")
 	}
 
@@ -121,6 +135,8 @@ func handleAction(instr Instruction, connection *websocket.Conn, mu *sync.Mutex)
 	// getting the phrase content--must come before image processing, otherwise a phony phrase can disrupt
 	// image showing on a robot, because the image is cancelled when any other command is sent
 	if action.SayItem != nil {
+		log.Printf("IP of the machine: %v", action.SayItem.FilePath)
+
 		phrase := PepperMessage{
 			Command: action.SayItem.Command(),
 			// NOTE: we send a phony string, because the phrase is being played in the client JS app currently

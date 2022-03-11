@@ -217,6 +217,7 @@ func pepperStatusJSONHandler(c *gin.Context) {
 func sendCommandHandler(c *gin.Context) {
 	form := struct {
 		ItemID uuid.UUID `json:"item_id" binding:"required"`
+		// FilePath string    `json:"file_path" binding:"required"`
 	}{}
 	err := c.BindJSON(&form)
 	if err != nil {
@@ -249,7 +250,12 @@ func sendCommandHandler(c *gin.Context) {
 		action, _ = actionsStore.GetByUUID(form.ItemID)
 	}
 	if action.IsNil() {
-		action, _ = audioStore.GetByUUID(form.ItemID)
+		action, err = audioStore.GetByUUID(form.ItemID)
+		// if action != nil{
+		// 	mems := action.(*Action)
+		// 	log.Printf(action.SayItem.FilePath)
+		// }
+
 	}
 	if action.IsNil() {
 		c.JSON(http.StatusNotFound, gin.H{
